@@ -13,3 +13,5 @@ build/
 
 *.log
 *chroma_db
+
+yolov8n.pt
