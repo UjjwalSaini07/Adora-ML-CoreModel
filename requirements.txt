@@ -12,3 +12,4 @@ scikit-learn   # for simple embeddings / semantic checks
 deap
 torch          # for yolov8 backend & optional aesthetic model
 tensorflow
+onnxruntime
