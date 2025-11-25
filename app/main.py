@@ -1,8 +1,10 @@
 from fastapi import FastAPI, File, UploadFile
 from PIL import Image
 import io
+import time
+import platform
 
-from app.vision import remove_background_bytes, ocr_image_bytes, run_yolo_bytes
+from app.vision import remove_background_bytes, ocr_image_bytes, run_yolo_bytes, yolo_model
 from app.autofix import hill_climb_autofix, simple_rules_fn
 from app.render import render_canvas
 from app.utils import normalize_text, detect_banned_phrases
@@ -60,3 +62,51 @@ async def render(packshot: UploadFile = File(...), background: UploadFile = File
 
     final_img = render_canvas(b, p, elements)
     return {"render_size": len(final_img)}
+
+@app.get("/health", tags=["Health Check"])
+def health_check():
+    status = {
+        "status": "OK",
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+        "python_version": platform.python_version(),
+        "system": platform.system(),
+        "machine": platform.machine(),
+        "components": {}
+    }
+
+    # YOLO
+    try:
+        _ = yolo_model.names
+        status["components"]["yolov8"] = "Loaded ✓"
+    except:
+        status["components"]["yolov8"] = "Failed ✗"
+
+    # ONNX Runtime
+    try:
+        import onnxruntime
+        status["components"]["onnxruntime"] = f"Available ✓ (v{onnxruntime.__version__})"
+    except:
+        status["components"]["onnxruntime"] = "Missing ✗"
+
+    # OCR
+    try:
+        import pytesseract
+        status["components"]["pytesseract"] = f"Available ✓ (v{pytesseract.get_tesseract_version()})"
+    except:
+        status["components"]["pytesseract"] = "Missing ✗"
+
+    # rembg
+    try:
+        import rembg
+        status["components"]["rembg"] = f"Available ✓ (v{rembg.__version__})"
+    except:
+        status["components"]["rembg"] = "Missing ✗"
+
+    # Pillow
+    try:
+        from PIL import Image
+        status["components"]["Pillow"] = "Available ✓"
+    except:
+        status["components"]["Pillow"] = "Missing ✗"
+
+    return status
