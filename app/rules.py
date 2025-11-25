@@ -2,31 +2,58 @@ from PIL import ImageStat, Image
 from app.utils import contrast_ratio, sample_pixel, sample_box_average, make_audit_entry
 import math
 
-def contrast_ratio(rgb1, rgb2):
-    # luminance calc per WCAG
-    def lum(c):
-        c = [x/255.0 for x in c]
-        def adjust(v):
-            return v/12.92 if v <= 0.03928 else ((v+0.055)/1.055)**2.4
-        r,g,b = map(adjust,c)
-        return 0.2126*r + 0.7152*g + 0.0722*b
-    L1, L2 = lum(rgb1), lum(rgb2)
-    L1, L2 = max(L1,L2), min(L1,L2)
-    return (L1 + 0.05) / (L2 + 0.05)
-
 def check_safe_zone(element_box, format_name="Story"):
     # Story format: top safe zone y >= 200px (example from spec)
-    # element_box = (x,y,w,h)
-    x,y,w,h = element_box
+    x, y, w, h = element_box
+
     if format_name == "Story":
         if y < 200:
-            return {"pass": False, "msg": f"Element y={y} in top safe zone < 200"}
-    return {"pass": True}
+            return make_audit_entry(
+                "safe_zone",
+                False,
+                f"Element y={y} in top safe zone < 200"
+            )
+
+    return make_audit_entry("safe_zone", True, "OK")
+
 
 def check_font_size(font_px, min_px=20):
     ok = font_px >= min_px
-    return {"pass": ok, "msg": f"font {font_px}px < min {min_px}px" if not ok else "ok"}
+    return make_audit_entry(
+        "font_size",
+        ok,
+        f"font {font_px}px < min {min_px}px" if not ok else "OK"
+    )
+
 
 def check_contrast_text_on_bg(text_rgb, bg_sample_rgb, min_ratio=4.5):
     ratio = contrast_ratio(text_rgb, bg_sample_rgb)
-    return {"pass": ratio >= min_ratio, "ratio": round(ratio,2)}
+
+    return make_audit_entry(
+        "contrast",
+        ratio >= min_ratio,
+        f"Contrast {ratio:.2f} < {min_ratio}" if ratio < min_ratio else "OK",
+        meta={"ratio": round(ratio, 2)}
+    )
+
+
+def run_all_rules(image, candidate):
+    """
+    Unified rule evaluator used by autofix.py
+    """
+    box = candidate["box"]
+    font_px = candidate["font_px"]
+    text_color = candidate["color_rgb"]
+
+    # sample background behind text
+    bg = sample_box_average(image, box)
+
+    results = {
+        "hard": [
+            check_safe_zone(box, candidate.get("format", "Story")),
+            check_font_size(font_px),
+            check_contrast_text_on_bg(text_color, bg)
+        ]
+    }
+
+    return results
