@@ -5,6 +5,7 @@ from rembg import remove
 from ultralytics import YOLO
 
 yolo_model = YOLO('yolov8n.pt')  # small model for speed
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 def remove_background_bytes(image_bytes: bytes) -> bytes:
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")

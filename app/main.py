@@ -1,8 +1,9 @@
-from fastapi import FastAPI, File, UploadFile
-from PIL import Image
 import io
 import time
+import base64
 import platform
+from PIL import Image
+from fastapi import FastAPI, File, UploadFile
 
 from app.vision import remove_background_bytes, ocr_image_bytes, run_yolo_bytes, yolo_model
 from app.autofix import hill_climb_autofix, simple_rules_fn
@@ -61,7 +62,12 @@ async def render(packshot: UploadFile = File(...), background: UploadFile = File
     }]
 
     final_img = render_canvas(b, p, elements)
-    return {"render_size": len(final_img)}
+    encoded = base64.b64encode(final_img).decode("utf-8")
+    return {
+        "status": "success",
+        "image_base64": encoded
+    }
+    # return {"render_size": len(final_img)}
 
 @app.get("/health", tags=["Health Check"])
 def health_check():
