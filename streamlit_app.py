@@ -140,51 +140,41 @@ elif page == "Validate":
     page_header("Validate Creative", "🔍")
 
     pack = st.file_uploader("Upload packshot", type=["jpg", "png"])
+    resp = None
 
     if pack:
         img_bytes = pack.read()
-
-        st.image(img_bytes, caption="Packshot", use_column_width=True)
+        st.image(img_bytes, caption="Packshot", use_container_width=True)
 
         if st.button("Run Validation"):
             with st.spinner("Running OCR + Object Detection + Compliance Checks..."):
                 resp = api_post(
-                    "/validate", 
+                    "/validate",
                     files={"packshot": (pack.name, img_bytes)}
                 )
 
-        if resp:
-            st.subheader("📝 Extracted Text (OCR)")
-            if resp["text"].strip():
-                st.code(resp["text"])
-            else:
-                st.warning("No readable text detected.")
+    # Show results AFTER button click
+    if resp:
+        st.subheader("📝 Extracted Text (OCR)")
+        st.code(resp.get("text", ""))
 
+        st.subheader("👁 Object Detections")
+        st.json(resp.get("detections", []))
 
-            st.subheader("👁 Object Detections")
-            if resp["detections"]:
-                st.json(resp["detections"])
-            else:
-                st.info("No objects detected.")
+        st.subheader("🚫 Banned Phrase Scan")
+        banned = resp.get("banned_phrases", [])
 
-            # ------------------------------------------------------
-            # BANNED PHRASE CHECK
-            # ------------------------------------------------------
-            st.subheader("🚫 Banned Phrase Scan")
+        if not banned:
+            st.success("✔ No banned phrases detected.")
+        else:
+            for b in banned:
+                st.error(f"⚠ Phrase: {b['phrase']} (similarity: {b['similarity']:.2f})")
 
-            banned = resp.get("banned_phrases", [])
-            if len(banned) == 0:
-                st.success("✔ No banned phrases detected.")
-            else:
-                for item in banned:
-                    st.error( f"⚠ **Phrase:** {item['phrase']} **Similarity:** {item['similarity']:.2f}" )
-
-            st.subheader("📊 Validation Summary")
-
-            if len(banned) == 0:
-                st.success("Creative Passed All Checks ✔")
-            else:
-                st.error("Creative Failed Compliance ❌")
+        st.subheader("📊 Validation Summary")
+        if not banned:
+            st.success("Creative Passed All Checks ✔")
+        else:
+            st.error("Creative Failed Compliance ❌")
 
 
 # Auto-Fix
