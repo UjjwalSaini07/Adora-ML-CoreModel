@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+pydantic
+python-multipart
+Pillow
+opencv-python
+numpy
+rembg
+pytesseract
+ultralytics
+sqlalchemy
+alembic
+streamlit
+diffusers
+transformers
+torch
+accelerate
