@@ -1,13 +1,28 @@
 version: "3.9"
 
 services:
-  adora-api:
+  backend:
     build: .
-    container_name: adora_api
+    container_name: adora_backend
+    command: uvicorn backend.utils.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
     volumes:
-      - .:/app  # live code reload if needed
+      - .:/app 
+
+  frontend:
+    build: .
+    container_name: adora_frontend
+    command: streamlit run frontend/app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
