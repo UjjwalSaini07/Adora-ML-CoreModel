@@ -19,5 +19,7 @@ CREATIVE_SIZES = {
 MAX_FILE_SIZE_BYTES = 500 * 1024  # 500 KB
 
 # LLM / SD feature flags
-USE_OLLAMA = False  # set True + configure in models/llm_client.py
-ENABLE_SD = False   # set True after configuring sd_client.py
+# USE_OLLAMA = False  # set True + configure in models/llm_client.py
+# ENABLE_SD = False   # set True after configuring sd_client.py
+USE_OLLAMA = True
+ENABLE_SD = True

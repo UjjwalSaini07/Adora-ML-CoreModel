@@ -24,7 +24,9 @@ def _neighbour_canvases(canvas: CreativeCanvas) -> List[CreativeCanvas]:
             neighbours.append(c2)
     return neighbours
 
-def hill_climb_autofix(canvas: CreativeCanvas, max_iters: int = 20) -> Tuple[CreativeCanvas, ValidationResult, List[str]]:
+def hill_climb_autofix(
+    canvas: CreativeCanvas, max_iters: int = 20
+) -> Tuple[CreativeCanvas, ValidationResult, List[str]]:
     current = deepcopy(canvas)
     current_val = run_rules(current)
     current_score = aesthetic_score(current) if current_val.passed else 0.0
@@ -44,10 +46,11 @@ def hill_climb_autofix(canvas: CreativeCanvas, max_iters: int = 20) -> Tuple[Cre
                 best_candidate = nc
                 best_val = val
                 best_score = score
-                best_fix_desc = "Adjusted text positions/font for better compliance"
+                best_fix_desc = "Adjusted text positions/font for better compliance & aesthetics"
 
         if best_candidate is current:
             break  # no improvement
+
         current = best_candidate
         current_val = best_val
         current_score = best_score
