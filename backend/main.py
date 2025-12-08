@@ -50,9 +50,11 @@ app.add_middleware(
 UPLOAD_DIR = DATA_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+
 @app.on_event("startup")
 def on_startup():
     init_db()
+
 
 # ---------- UPLOAD ----------
 @app.post("/upload", response_model=UploadedImage)
@@ -85,6 +87,7 @@ async def upload_image(
     detections = detect_person_and_objects(img)
     person_present = any(d["label"] == "person" for d in detections)
 
+    # NOTE: You can return OCR/detections in extra if your UploadedImage schema supports it.
     return UploadedImage(id=img_id, role=role, path=str(dest))
 
 
@@ -226,42 +229,48 @@ def health_check():
         "python_version": platform.python_version(),
         "system": platform.system(),
         "machine": platform.machine(),
-        "components": {}
+        "components": {},
     }
 
-    # YOLO
+    # YOLO / detection pipeline
     try:
-        _ = yolo_model.names
-        status["components"]["yolov8"] = "Loaded ✓"
-    except:
-        status["components"]["yolov8"] = "Failed ✗"
+        from .models import detection  # noqa: F401
+        status["components"]["yolov8"] = "Available ✓"
+    except Exception:
+        status["components"]["yolov8"] = "Missing ✗"
 
     # ONNX Runtime
     try:
         import onnxruntime
+
         status["components"]["onnxruntime"] = f"Available ✓ (v{onnxruntime.__version__})"
-    except:
+    except Exception:
         status["components"]["onnxruntime"] = "Missing ✗"
 
-    # OCR
+    # OCR (pytesseract)
     try:
         import pytesseract
-        status["components"]["pytesseract"] = f"Available ✓ (v{pytesseract.get_tesseract_version()})"
-    except:
+
+        status["components"]["pytesseract"] = (
+            f"Available ✓ (v{pytesseract.get_tesseract_version()})"
+        )
+    except Exception:
         status["components"]["pytesseract"] = "Missing ✗"
 
     # rembg
     try:
         import rembg
+
         status["components"]["rembg"] = f"Available ✓ (v{rembg.__version__})"
-    except:
+    except Exception:
         status["components"]["rembg"] = "Missing ✗"
 
     # Pillow
     try:
-        from PIL import Image
+        from PIL import Image as _PILImage  # noqa: F401
+
         status["components"]["Pillow"] = "Available ✓"
-    except:
+    except Exception:
         status["components"]["Pillow"] = "Missing ✗"
 
     return status

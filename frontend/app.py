@@ -122,3 +122,25 @@ with cols2[2]:
             st.write(f"Audit log: {data['audit_log_path']}")
         else:
             st.error(f"Backend error: {resp.status_code} {resp.text}")
+
+# ---------- BACKEND HEALTH SECTION ----------
+st.subheader("🩺 Backend Health")
+
+if st.button("🔍 Check Backend Health"):
+    try:
+        resp = requests.get(f"{BACKEND_URL}/health", timeout=5)
+        if resp.ok:
+            data = resp.json()
+            st.success(f"Status: {data.get('status', 'Unknown')}")
+            st.write(f"Timestamp: {data.get('timestamp', 'N/A')}")
+            st.write(f"Python: {data.get('python_version', 'N/A')}")
+            st.write(f"System: {data.get('system', 'N/A')} ({data.get('machine', 'N/A')})")
+
+            st.markdown("**Components:**")
+            components = data.get("components", {})
+            for name, status_text in components.items():
+                st.write(f"- `{name}`: {status_text}")
+        else:
+            st.error(f"Health endpoint error: {resp.status_code} {resp.text}")
+    except Exception as e:
+        st.error(f"Failed to reach backend health endpoint: {e}")
