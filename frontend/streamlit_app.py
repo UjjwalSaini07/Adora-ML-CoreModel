@@ -8,6 +8,45 @@ import numpy as np
 
 BACKEND_URL = 'http://localhost:8000'
 
+# Authentication state management
+if 'auth_token' not in st.session_state:
+    st.session_state.auth_token = None
+if 'current_user' not in st.session_state:
+    st.session_state.current_user = None
+
+def get_auth_headers():
+    if st.session_state.auth_token:
+        return {'Authorization': f'Bearer {st.session_state.auth_token}'}
+    return {}
+
+def login(username, password):
+    try:
+        resp = requests.post(f'{BACKEND_URL}/login', data={'username': username, 'password': password})
+        if resp.ok:
+            data = resp.json()
+            st.session_state.auth_token = data['access_token']
+            st.session_state.current_user = {'username': username}
+            return True, "Login successful"
+        else:
+            return False, "Invalid credentials"
+    except Exception as e:
+        return False, str(e)
+
+def logout():
+    st.session_state.auth_token = None
+    st.session_state.current_user = None
+    st.rerun()
+
+def register(username, password, email):
+    try:
+        resp = requests.post(f'{BACKEND_URL}/register', data={'username': username, 'password': password, 'email': email})
+        if resp.ok:
+            return True, "Registration successful"
+        else:
+            return False, resp.json().get('detail', 'Registration failed')
+    except Exception as e:
+        return False, str(e)
+
 st.set_page_config(
     page_title='Adora: Retail Media Creative Builder',
     layout='wide',
@@ -100,8 +139,58 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Authentication UI
+if not st.session_state.auth_token:
+    st.markdown('<h1 class="main-header">Adora: Retail Media Creative Builder</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">Advanced AI-Powered Creative Asset Management Platform</p>', unsafe_allow_html=True)
+
+    tab1, tab2 = st.tabs(["Login", "Register"])
+
+    with tab1:
+        st.subheader("Login")
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Login")
+            if submitted:
+                success, message = login(username, password)
+                if success:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+
+    with tab2:
+        st.subheader("Register")
+        with st.form("register_form"):
+            new_username = st.text_input("Username")
+            new_email = st.text_input("Email")
+            new_password = st.text_input("Password", type="password")
+            confirm_password = st.text_input("Confirm Password", type="password")
+            submitted = st.form_submit_button("Register")
+            if submitted:
+                if new_password != confirm_password:
+                    st.error("Passwords do not match")
+                elif len(new_password) < 6:
+                    st.error("Password must be at least 6 characters")
+                else:
+                    success, message = register(new_username, new_password, new_email)
+                    if success:
+                        st.success(message)
+                        st.info("You can now login with your credentials")
+                    else:
+                        st.error(message)
+    st.stop()
+
+# Main app for authenticated users
 st.markdown('<h1 class="main-header">Adora: Retail Media Creative Builder</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Advanced AI-Powered Creative Asset Management Platform</p>', unsafe_allow_html=True)
+
+# User info and logout in sidebar
+with st.sidebar:
+    st.write(f"Logged in as: **{st.session_state.current_user['username']}**")
+    if st.button("Logout", type="secondary"):
+        logout()
 
 # Initialize session state
 if 'selected_asset' not in st.session_state:
@@ -116,7 +205,8 @@ with st.sidebar:
     if uploaded and st.button('Upload Asset', type='primary'):
         with st.spinner('Uploading asset...'):
             files = {'file': (uploaded.name, uploaded.getvalue())}
-            resp = requests.post(f'{BACKEND_URL}/upload_packshot', files=files, data={'label':label})
+            data = {'label': label}
+            resp = requests.post(f'{BACKEND_URL}/upload_packshot', files=files, data=data, headers=get_auth_headers())
         if resp.ok:
             st.success('Asset uploaded successfully! Refresh to view.')
         else:
@@ -129,10 +219,11 @@ st.sidebar.subheader('Navigation')
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 'Dashboard'
 
-nav_options = ['Dashboard', 'Asset Library', 'Image Editor', 'Compliance Check']
+nav_options = ['Dashboard', 'Asset Library', 'Image Editor', 'AI Analysis', 'Version History', 'Compliance Check']
 for option in nav_options:
+    icon = {'Dashboard': '📊', 'Asset Library': '🖼️', 'Image Editor': '✏️', 'AI Analysis': '🤖', 'Version History': '📚', 'Compliance Check': '✅'}[option]
     if st.sidebar.button(
-        f"{'📊' if option=='Dashboard' else '🖼️' if option=='Asset Library' else '✏️' if option=='Image Editor' else '✅'} {option}",
+        f"{icon} {option}",
         key=f"nav_{option}",
         help=f"Navigate to {option}",
         use_container_width=True
@@ -156,7 +247,7 @@ if st.session_state.current_page == 'Dashboard':
         export = st.button('📊 Export CSV Report', help='Download comprehensive system report as CSV', use_container_width=True)
         if export:
             with st.spinner('Generating comprehensive report...'):
-                resp = requests.get(f'{BACKEND_URL}/export_report')
+                resp = requests.get(f'{BACKEND_URL}/export_report', headers=get_auth_headers())
             if resp.ok:
                 data = resp.json()
                 st.success(f'✅ Report generated with {data["metrics_count"]} metrics!')
@@ -182,7 +273,7 @@ if st.session_state.current_page == 'Dashboard':
             else:
                 st.error('Failed to generate report')
 
-    resp = requests.get(f'{BACKEND_URL}/assets')
+    resp = requests.get(f'{BACKEND_URL}/assets', headers=get_auth_headers())
     if resp.ok:
         assets = resp.json()
         total_assets = len(assets)
@@ -205,7 +296,7 @@ if st.session_state.current_page == 'Dashboard':
         with col3:
             st.metric('Compliance Rate', '98.5%', delta='+0.5%')
         with col4:
-            avg_size = np.mean([len(requests.get(f'{BACKEND_URL}/asset/{a["id"]}').content) for a in assets[:min(10, len(assets))]]) / 1024 if assets else 0
+            avg_size = np.mean([len(requests.get(f'{BACKEND_URL}/asset/{a["id"]}', headers=get_auth_headers()).content) for a in assets[:min(10, len(assets))]]) / 1024 if assets else 0
             st.metric('Avg Size', f'{avg_size:.1f} KB')
         with col5:
             st.metric('Active Users', '24', delta='+3 today')
@@ -519,7 +610,7 @@ if st.session_state.current_page == 'Dashboard':
                 # Clean Up Assets
                 if st.button('🧹 Clean Up Assets', help='Remove unused assets older than 30 days', use_container_width=True):
                     with st.spinner('Checking for old assets...'):
-                        resp = requests.post(f'{BACKEND_URL}/cleanup_assets', data={'days': 30})
+                        resp = requests.post(f'{BACKEND_URL}/cleanup_assets', data={'days': 30}, headers=get_auth_headers())
                     if resp.ok:
                         data = resp.json()
                         st.info(f'Found {data["found_old_assets"]} assets older than 30 days')
@@ -535,7 +626,7 @@ if st.session_state.current_page == 'Dashboard':
                 # Generate Report
                 if st.button('📊 Generate Report', help='Create monthly analytics report', use_container_width=True):
                     with st.spinner('Generating report...'):
-                        resp = requests.post(f'{BACKEND_URL}/generate_report')
+                        resp = requests.post(f'{BACKEND_URL}/generate_report', headers=get_auth_headers())
                     if resp.ok:
                         data = resp.json()
                         st.success('Report Generated Successfully!')
@@ -550,7 +641,7 @@ if st.session_state.current_page == 'Dashboard':
                 # System Maintenance (Health Check)
                 if st.button('🔧 System Maintenance', help='Run system health checks', use_container_width=True):
                     with st.spinner('Running health checks...'):
-                        resp = requests.post(f'{BACKEND_URL}/system_health')
+                        resp = requests.post(f'{BACKEND_URL}/system_health', headers=get_auth_headers())
                     if resp.ok:
                         data = resp.json()
                         st.success('Health check completed!')
@@ -578,7 +669,7 @@ if st.session_state.current_page == 'Dashboard':
                 # Backup Data
                 if st.button('💾 Backup Data', help='Create system backup', use_container_width=True):
                     with st.spinner('Creating backup...'):
-                        resp = requests.post(f'{BACKEND_URL}/backup_data')
+                        resp = requests.post(f'{BACKEND_URL}/backup_data', headers=get_auth_headers())
                     if resp.ok:
                         data = resp.json()
                         if data['status'] == 'success':
@@ -624,7 +715,7 @@ if st.session_state.current_page == 'Dashboard':
                     sizes = []
                     for asset in assets[:min(100, len(assets))]:  # Increased sample size
                         try:
-                            size_kb = len(requests.get(f'{BACKEND_URL}/asset/{asset["id"]}').content) / 1024
+                            size_kb = len(requests.get(f'{BACKEND_URL}/asset/{asset["id"]}', headers=get_auth_headers()).content) / 1024
                             sizes.append(size_kb)
                         except:
                             continue
@@ -862,7 +953,7 @@ elif st.session_state.current_page == 'Asset Library':
     st.markdown('<h2 class="section-header">Asset Library</h2>', unsafe_allow_html=True)
     st.markdown('Browse and manage your creative assets.')
 
-    resp = requests.get(f'{BACKEND_URL}/assets')
+    resp = requests.get(f'{BACKEND_URL}/assets', headers=get_auth_headers())
     if resp.ok:
         assets = resp.json()
         if assets:
@@ -877,7 +968,7 @@ elif st.session_state.current_page == 'Asset Library':
                 with cols[i % 4]:
                     with st.container():
                         st.markdown('<div class="asset-card">', unsafe_allow_html=True)
-                        resp_img = requests.get(f'{BACKEND_URL}/asset/{asset["id"]}')
+                        resp_img = requests.get(f'{BACKEND_URL}/asset/{asset["id"]}', headers=get_auth_headers())
                         if resp_img.ok:
                             st.image(resp_img.content, width=150)
                         st.caption(f'ID: {asset["id"]}')
@@ -900,7 +991,7 @@ elif st.session_state.current_page == 'Image Editor':
         st.subheader('Select Asset')
         asset_id = st.number_input('Asset ID', min_value=0, value=st.session_state.selected_asset, key='manip_asset_id', help='Enter asset ID or select from Asset Library tab')
         if asset_id > 0:
-            resp = requests.get(f'{BACKEND_URL}/asset/{asset_id}')
+            resp = requests.get(f'{BACKEND_URL}/asset/{asset_id}', headers=get_auth_headers())
             if resp.ok:
                 st.image(resp.content, caption='Source Image', width=300)
             else:
@@ -950,7 +1041,7 @@ elif st.session_state.current_page == 'Image Editor':
                     'overlay_y': overlay_y,
                     'font_size': font_size
                 }
-                resp = requests.post(f'{BACKEND_URL}/manipulate_image', data=data)
+                resp = requests.post(f'{BACKEND_URL}/manipulate_image', data=data, headers=get_auth_headers())
             if resp.ok:
                 st.success('Image processing completed successfully!')
             else:
@@ -960,6 +1051,141 @@ elif st.session_state.current_page == 'Image Editor':
         st.subheader('Processing Preview')
         st.info('Processed images are saved server-side. Check Asset Library for results.')
         # In production, add preview functionality
+
+elif st.session_state.current_page == 'AI Analysis':
+    st.markdown('<h2 class="section-header">AI-Powered Image Analysis</h2>', unsafe_allow_html=True)
+    st.markdown('Get intelligent insights and auto-tagging for your creative assets.')
+
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.subheader('Select Asset for Analysis')
+        analysis_asset_id = st.number_input('Asset ID', min_value=0, value=st.session_state.selected_asset, key='analysis_asset_id', help='Enter asset ID to analyze')
+
+        if analysis_asset_id > 0:
+            resp = requests.get(f'{BACKEND_URL}/asset/{analysis_asset_id}', headers=get_auth_headers())
+            if resp.ok:
+                st.image(resp.content, caption=f'Asset {analysis_asset_id}', width=250)
+            else:
+                st.error('Asset not found')
+
+        if st.button('Analyze Image', type='primary', use_container_width=True):
+            with st.spinner('AI analyzing image...'):
+                resp = requests.post(f'{BACKEND_URL}/analyze_image', data={'asset_id': analysis_asset_id}, headers=get_auth_headers())
+            if resp.ok:
+                analysis = resp.json()
+                st.session_state.last_analysis = analysis
+                st.success('Analysis complete!')
+            else:
+                st.error('Analysis failed')
+
+    with col2:
+        st.subheader('Analysis Results')
+        if 'last_analysis' in st.session_state:
+            analysis = st.session_state.last_analysis
+
+            # Basic info
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                st.metric('Dimensions', f"{analysis['dimensions']['width']}x{analysis['dimensions']['height']}")
+            with col_b:
+                st.metric('File Size', f"{analysis['file_size_kb']:.1f} KB")
+            with col_c:
+                st.metric('Aspect Ratio', f"{analysis['aspect_ratio']:.2f}")
+
+            # Color analysis
+            st.subheader('🎨 Color Analysis')
+            avg_color = analysis['average_color']
+            st.write(f"Average Color: RGB({avg_color[0]}, {avg_color[1]}, {avg_color[2]})")
+            st.color_picker('Average Color', value=f"#{avg_color[0]:02x}{avg_color[1]:02x}{avg_color[2]:02x}", disabled=True)
+
+            # Technical metrics
+            st.subheader('📊 Technical Metrics')
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric('Brightness', f"{analysis['brightness']:.1f}")
+            with col2:
+                st.metric('Complexity', f"{analysis['complexity_score']:.3f}")
+            with col3:
+                st.metric('Has Text', 'Yes' if analysis['has_text'] else 'No')
+
+            # Auto tags
+            st.subheader('🏷️ Auto-Generated Tags')
+            tags = analysis.get('auto_tags', [])
+            if tags:
+                st.write(' '.join([f"#{tag}" for tag in tags]))
+            else:
+                st.write('No tags generated')
+
+            # Extracted text
+            if analysis.get('extracted_text'):
+                st.subheader('📝 Extracted Text')
+                st.text_area('Text Content', analysis['extracted_text'], height=100, disabled=True)
+
+elif st.session_state.current_page == 'Version History':
+    st.markdown('<h2 class="section-header">Asset Version History</h2>', unsafe_allow_html=True)
+    st.markdown('Track changes and restore previous versions of your assets.')
+
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.subheader('Select Asset')
+        version_asset_id = st.number_input('Asset ID', min_value=0, value=st.session_state.selected_asset, key='version_asset_id', help='Enter asset ID to view history')
+
+        if version_asset_id > 0:
+            # Get current asset
+            resp = requests.get(f'{BACKEND_URL}/asset/{version_asset_id}', headers=get_auth_headers())
+            if resp.ok:
+                st.image(resp.content, caption=f'Current Version (Asset {version_asset_id})', width=250)
+                st.caption('This is the current version')
+            else:
+                st.error('Asset not found')
+
+            # Get version history
+            if st.button('Load Version History', use_container_width=True):
+                with st.spinner('Loading version history...'):
+                    resp = requests.get(f'{BACKEND_URL}/asset/{version_asset_id}/versions', headers=get_auth_headers())
+                if resp.ok:
+                    versions = resp.json()['versions']
+                    st.session_state.version_history = versions
+                    st.success(f'Loaded {len(versions)} versions')
+                else:
+                    st.error('Failed to load version history')
+
+    with col2:
+        st.subheader('Version History')
+        if 'version_history' in st.session_state:
+            versions = st.session_state.version_history
+
+            for version in versions:
+                with st.expander(f"Version {version['version']} - {version['operation']} ({time.strftime('%Y-%m-%d %H:%M', time.localtime(version['created_at']))})"):
+                    col_a, col_b = st.columns([1, 2])
+                    with col_a:
+                        # Show version image
+                        resp = requests.get(f'{BACKEND_URL}/asset/{version_asset_id}/version/{version["version"]}', headers=get_auth_headers())
+                        if resp.ok:
+                            st.image(resp.content, width=150)
+                        else:
+                            st.error('Version image not available')
+
+                    with col_b:
+                        st.write(f"**Operation:** {version['operation']}")
+                        st.write(f"**Created by:** {version.get('created_by', 'Unknown')}")
+                        st.write(f"**Timestamp:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(version['created_at']))}")
+
+                        if version.get('params'):
+                            st.write("**Parameters:**")
+                            st.json(version['params'])
+
+                        # Restore button
+                        if st.button(f'Restore to Version {version["version"]}', key=f'restore_{version["version"]}', use_container_width=True):
+                            with st.spinner('Restoring version...'):
+                                resp = requests.post(f'{BACKEND_URL}/asset/{version_asset_id}/restore/{version["version"]}', headers=get_auth_headers())
+                            if resp.ok:
+                                data = resp.json()
+                                st.success(f'Asset restored to version {data["new_version"]}!')
+                                # Refresh version history
+                                del st.session_state.version_history
+                            else:
+                                st.error('Restore failed')
 
 elif st.session_state.current_page == 'Compliance Check':
     st.markdown('<h2 class="section-header">Compliance Validation</h2>', unsafe_allow_html=True)
@@ -978,7 +1204,7 @@ elif st.session_state.current_page == 'Compliance Check':
             submitted = st.form_submit_button('Validate Content', use_container_width=True)
             if submitted:
                 with st.spinner('Checking guidelines...'):
-                    resp = requests.post(f'{BACKEND_URL}/validate', data={'headline':headline,'subhead':subhead,'caveat':caveat,'tags':tags})
+                    resp = requests.post(f'{BACKEND_URL}/validate', data={'headline':headline,'subhead':subhead,'caveat':caveat,'tags':tags}, headers=get_auth_headers())
                 if resp.ok:
                     issues = resp.json().get('issues', [])
                     if issues:
@@ -997,7 +1223,7 @@ elif st.session_state.current_page == 'Compliance Check':
         st.subheader('Image Compliance')
         img_asset_id = st.number_input('Asset ID for Validation', min_value=0, value=st.session_state.selected_asset, key='val_asset_id', help='Select asset from library')
         if img_asset_id > 0:
-            resp = requests.get(f'{BACKEND_URL}/asset/{img_asset_id}')
+            resp = requests.get(f'{BACKEND_URL}/asset/{img_asset_id}', headers=get_auth_headers())
             if resp.ok:
                 st.image(resp.content, caption=f'Asset {img_asset_id}', width=250)
             else:
@@ -1005,7 +1231,7 @@ elif st.session_state.current_page == 'Compliance Check':
 
         if st.button('Check Image Compliance', use_container_width=True):
             with st.spinner('Analyzing image...'):
-                resp = requests.post(f'{BACKEND_URL}/validate_image', data={'asset_id': int(img_asset_id)})
+                resp = requests.post(f'{BACKEND_URL}/validate_image', data={'asset_id': int(img_asset_id)}, headers=get_auth_headers())
             if resp.ok:
                 issues = resp.json().get('issues', [])
                 if issues:

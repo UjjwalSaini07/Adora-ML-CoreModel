@@ -10,3 +10,5 @@ torch
 psutil
 onnxruntime
 pandas
+pyjwt
+bcrypt
