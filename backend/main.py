@@ -93,11 +93,11 @@ async def upload_packshot(file: UploadFile = File(...), label: str = Form(None),
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get('/assets')
-def assets():
+def assets(current_user: dict = Depends(verify_token)):
     return list_assets(DB_PATH)
 
 @app.get('/asset/{asset_id}')
-def asset(asset_id: int):
+def asset(asset_id: int, current_user: dict = Depends(verify_token)):
     path = get_asset_path(DB_PATH, asset_id)
     if not path or not os.path.exists(path):
         raise HTTPException(status_code=404, detail='Asset not found')
@@ -150,14 +150,14 @@ async def manipulate_image(asset_id: int = Form(...), remove_bg: bool = Form(Fal
     return {'result_path': out_path, 'new_version': new_version, 'operations_applied': operations_applied}
 
 @app.post('/validate')
-async def validate(headline: str = Form(''), subhead: str = Form(''), caveat: str = Form(''), tags: str = Form('')):
+async def validate(headline: str = Form(''), subhead: str = Form(''), caveat: str = Form(''), tags: str = Form(''), current_user: dict = Depends(verify_token)):
     payload = {'headline': headline, 'subhead': subhead, 'caveat': caveat, 'tags': tags}
     issues = validate_creative_rules(payload)
     logger.info(f'Validation run issues={issues}')
     return {'issues': issues}
 
 @app.post('/validate_image')
-async def validate_image(asset_id: int = Form(...)):
+async def validate_image(asset_id: int = Form(...), current_user: dict = Depends(verify_token)):
     path = get_asset_path(DB_PATH, asset_id)
     if not path:
         raise HTTPException(status_code=404, detail='Asset not found')
@@ -173,7 +173,7 @@ def download_sample_zip():
     return FileResponse(zipf, media_type='application/zip', filename='sample_output.zip')
 
 @app.post('/system_health')
-def system_health():
+def system_health(current_user: dict = Depends(verify_token)):
     import psutil
     health_data = {
         'timestamp': time.time(),
@@ -190,7 +190,7 @@ def system_health():
     return health_data
 
 @app.post('/cleanup_assets')
-def cleanup_assets(days: int = 30):
+def cleanup_assets(days: int = 30, current_user: dict = Depends(verify_token)):
     cutoff = time.time() - (days * 24 * 60 * 60)
     assets = list_assets(DB_PATH)
     old_assets = [a for a in assets if a['uploaded_at'] < cutoff]
@@ -203,7 +203,7 @@ def cleanup_assets(days: int = 30):
     return result
 
 @app.post('/generate_report')
-def generate_report():
+def generate_report(current_user: dict = Depends(verify_token)):
     assets = list_assets(DB_PATH)
     total_assets = len(assets)
     processed = sum(1 for a in assets if 'processed' in (a.get('label') or '').lower())
@@ -216,21 +216,24 @@ def generate_report():
         'processing_rate': (processed / total_assets * 100) if total_assets > 0 else 0,
         'average_file_size_kb': avg_size,
         'storage_estimate_mb': total_assets * 0.15,
-        'top_labels': {} 
+        'top_labels': {}
     }
     logger.info(f'Report generated: {report}')
     return report
 
 @app.post('/backup_data')
-def backup_data():
+def backup_data(current_user: dict = Depends(verify_token)):
     import shutil
     backup_time = time.strftime('%Y%m%d_%H%M%S')
     backup_dir = f'backup_{backup_time}'
     try:
-        shutil.copytree('storage', f'storage/{backup_dir}')
+        # Use BASE_DIR to ensure correct path
+        storage_path = str(BASE_DIR)
+        backup_path = os.path.join(storage_path, backup_dir)
+        shutil.copytree(storage_path, backup_path)
         result = {
             'status': 'success',
-            'backup_path': f'storage/{backup_dir}',
+            'backup_path': backup_path,
             'timestamp': time.time(),
             'message': f'Backup created successfully at {backup_dir}'
         }
@@ -269,7 +272,7 @@ async def batch_upload(files: List[UploadFile] = File(...), labels: str = Form(N
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post('/batch_manipulate')
-async def batch_manipulate(asset_ids: str = Form(...), operations: str = Form(...)):
+async def batch_manipulate(asset_ids: str = Form(...), operations: str = Form(...), current_user: dict = Depends(verify_token)):
     """
     Apply manipulations to multiple assets in batch
     """
@@ -317,11 +320,19 @@ async def batch_manipulate(asset_ids: str = Form(...), operations: str = Form(..
                 out_path = overlay_text(out_path, text_data['text'], text_data['x'], text_data['y'], text_data['font_size'])
                 applied_ops.append('overlay_text')
 
+            # Save new version for batch operations
+            operation_params = {
+                'batch_operation': True,
+                'operations': operations_dict
+            }
+            new_version = save_asset_version(DB_PATH, asset_id, out_path, 'batch_manipulate', json.dumps(operation_params), current_user['sub'])
+
             results.append({
                 'asset_id': asset_id,
                 'status': 'success',
                 'result_path': out_path,
-                'applied_operations': applied_ops
+                'applied_operations': applied_ops,
+                'new_version': new_version
             })
 
         logger.info(f'Batch manipulated {len(asset_ids_list)} assets')
@@ -331,7 +342,7 @@ async def batch_manipulate(asset_ids: str = Form(...), operations: str = Form(..
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post('/batch_validate')
-async def batch_validate(asset_ids: str = Form(...)):
+async def batch_validate(asset_ids: str = Form(...), current_user: dict = Depends(verify_token)):
     """
     Validate multiple assets in batch
     """
@@ -360,7 +371,7 @@ async def batch_validate(asset_ids: str = Form(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post('/analyze_image')
-async def analyze_image(asset_id: int = Form(...)):
+async def analyze_image(asset_id: int = Form(...), current_user: dict = Depends(verify_token)):
     """
     AI-powered image analysis including auto-tagging and object detection
     """
@@ -612,7 +623,7 @@ async def restore_asset_version(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get('/export_report')
-def export_report():
+def export_report(current_user: dict = Depends(verify_token)):
     assets = list_assets(DB_PATH)
     total_assets = len(assets)
 

@@ -56,9 +56,9 @@ def save_asset(db_path, filepath, label, created_by=None):
 def list_assets(db_path):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    rows = c.execute('SELECT id, label, path, uploaded_at FROM assets ORDER BY uploaded_at DESC').fetchall()
+    rows = c.execute('SELECT id, label, path, uploaded_at, current_version, created_by FROM assets ORDER BY uploaded_at DESC').fetchall()
     conn.close()
-    return [{'id': r[0], 'label': r[1], 'path': r[2], 'uploaded_at': r[3]} for r in rows]
+    return [{'id': r[0], 'label': r[1], 'path': r[2], 'uploaded_at': r[3], 'current_version': r[4], 'created_by': r[5]} for r in rows]
 
 def get_asset_path(db_path, asset_id, version=None):
     conn = sqlite3.connect(db_path)
