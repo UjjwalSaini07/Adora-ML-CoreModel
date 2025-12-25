@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import uvicorn
 import os
-from db import init_db, save_asset, list_assets, get_asset_path
+from db import init_db, save_asset, list_assets, get_asset_path, save_asset_version, get_asset_versions, add_asset_comment, get_asset_comments
 from utils import save_upload_file_temp, remove_background, resize_image, rotate_image, crop_image, apply_filter, overlay_text
 from guidelines import validate_creative_rules, validate_image_guidelines
 import logging
@@ -16,6 +16,20 @@ import numpy as np
 import time
 import pandas as pd
 import io
+import json
+from typing import List
+import jwt
+import bcrypt
+from datetime import datetime, timedelta
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, Security
+
+# Authentication configuration
+JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key-change-in-production')
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION_HOURS = 24
+
+security = HTTPBearer()
 
 BASE_DIR = Path(__file__).resolve().parent.parent / "storage"
 LOG_DIR = os.getenv('LOG_DIR', str(BASE_DIR / "logs"))
@@ -44,11 +58,34 @@ init_db(DB_PATH)
 GPU_AVAILABLE = torch.cuda.is_available() if 'torch' in globals() else False
 logger.info(f'GPU available: {GPU_AVAILABLE}')
 
+# Authentication functions
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 @app.post('/upload_packshot')
-async def upload_packshot(file: UploadFile = File(...), label: str = Form(None)):
+async def upload_packshot(file: UploadFile = File(...), label: str = Form(None), current_user: dict = Depends(verify_token)):
     try:
         tmp_path = save_upload_file_temp(file, subfolder='uploads')
-        asset_id = save_asset(DB_PATH, tmp_path, label or file.filename)
+        asset_id = save_asset(DB_PATH, tmp_path, label or file.filename, current_user['sub'])
         logger.info(f'Uploaded asset {asset_id} label={label} filename={file.filename}')
         return {'asset_id': asset_id, 'filename': file.filename}
     except Exception as e:
@@ -68,28 +105,49 @@ def asset(asset_id: int):
 
 @app.post('/manipulate_image')
 async def manipulate_image(asset_id: int = Form(...), remove_bg: bool = Form(False),
-                            width: int = Form(None), height: int = Form(None), rotate: int = Form(0),
-                            crop_left: int = Form(None), crop_top: int = Form(None), crop_right: int = Form(None), crop_bottom: int = Form(None),
-                            filter_type: str = Form(None), filter_value: float = Form(1.0),
-                            overlay_text_str: str = Form(''), overlay_x: int = Form(0), overlay_y: int = Form(0), font_size: int = Form(20)):
+                             width: int = Form(None), height: int = Form(None), rotate: int = Form(0),
+                             crop_left: int = Form(None), crop_top: int = Form(None), crop_right: int = Form(None), crop_bottom: int = Form(None),
+                             filter_type: str = Form(None), filter_value: float = Form(1.0),
+                             overlay_text_str: str = Form(''), overlay_x: int = Form(0), overlay_y: int = Form(0), font_size: int = Form(20),
+                             current_user: dict = Depends(verify_token)):
     path = get_asset_path(DB_PATH, asset_id)
     if not path:
         raise HTTPException(status_code=404, detail='Asset not found')
     out_path = path
+    operations_applied = []
+
     if remove_bg:
         out_path = remove_background(out_path)
+        operations_applied.append('remove_bg')
     if crop_left is not None and crop_top is not None and crop_right is not None and crop_bottom is not None:
         out_path = crop_image(out_path, crop_left, crop_top, crop_right, crop_bottom)
+        operations_applied.append('crop')
     if width or height:
         out_path = resize_image(out_path, width=width, height=height)
+        operations_applied.append('resize')
     if rotate:
         out_path = rotate_image(out_path, rotate)
+        operations_applied.append('rotate')
     if filter_type:
         out_path = apply_filter(out_path, filter_type, filter_value)
+        operations_applied.append('filter')
     if overlay_text_str:
         out_path = overlay_text(out_path, overlay_text_str, overlay_x, overlay_y, font_size)
-    logger.info(f'Manipulated image {asset_id} -> {out_path} remove_bg={remove_bg} crop=({crop_left},{crop_top},{crop_right},{crop_bottom}) size=({width},{height}) rotate={rotate} filter={filter_type}:{filter_value} text="{overlay_text_str}"')
-    return {'result_path': out_path}
+        operations_applied.append('overlay_text')
+
+    # Save new version
+    operation_params = {
+        'remove_bg': remove_bg,
+        'crop': {'left': crop_left, 'top': crop_top, 'right': crop_right, 'bottom': crop_bottom} if crop_left is not None else None,
+        'resize': {'width': width, 'height': height} if width or height else None,
+        'rotate': rotate if rotate else None,
+        'filter': {'type': filter_type, 'value': filter_value} if filter_type else None,
+        'overlay_text': {'text': overlay_text_str, 'x': overlay_x, 'y': overlay_y, 'font_size': font_size} if overlay_text_str else None
+    }
+    new_version = save_asset_version(DB_PATH, asset_id, out_path, 'manipulate', json.dumps(operation_params), current_user['sub'])
+
+    logger.info(f'Manipulated image {asset_id} -> {out_path} operations={operations_applied} new_version={new_version}')
+    return {'result_path': out_path, 'new_version': new_version, 'operations_applied': operations_applied}
 
 @app.post('/validate')
 async def validate(headline: str = Form(''), subhead: str = Form(''), caveat: str = Form(''), tags: str = Form('')):
@@ -184,6 +242,374 @@ def backup_data():
         }
     logger.info(f'Backup operation: {result}')
     return result
+
+@app.post('/batch_upload')
+async def batch_upload(files: List[UploadFile] = File(...), labels: str = Form(None), current_user: dict = Depends(verify_token)):
+    """
+    Upload multiple assets in batch
+    """
+    try:
+        labels_list = labels.split(',') if labels else []
+        results = []
+
+        for i, file in enumerate(files):
+            tmp_path = save_upload_file_temp(file, subfolder='uploads')
+            label = labels_list[i] if i < len(labels_list) else None
+            asset_id = save_asset(DB_PATH, tmp_path, label or file.filename, current_user['sub'])
+            results.append({
+                'asset_id': asset_id,
+                'filename': file.filename,
+                'label': label
+            })
+            logger.info(f'Batch uploaded asset {asset_id} filename={file.filename}')
+
+        return {'uploaded_assets': results, 'total_uploaded': len(results)}
+    except Exception as e:
+        logger.exception('Batch upload failed')
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/batch_manipulate')
+async def batch_manipulate(asset_ids: str = Form(...), operations: str = Form(...)):
+    """
+    Apply manipulations to multiple assets in batch
+    """
+    try:
+        import json
+        asset_ids_list = [int(x.strip()) for x in asset_ids.split(',')]
+        operations_dict = json.loads(operations)
+
+        results = []
+        for asset_id in asset_ids_list:
+            path = get_asset_path(DB_PATH, asset_id)
+            if not path:
+                results.append({'asset_id': asset_id, 'status': 'error', 'message': 'Asset not found'})
+                continue
+
+            out_path = path
+            applied_ops = []
+
+            # Apply operations in sequence
+            if operations_dict.get('remove_bg', False):
+                out_path = remove_background(out_path)
+                applied_ops.append('remove_bg')
+
+            if 'crop' in operations_dict:
+                crop_data = operations_dict['crop']
+                out_path = crop_image(out_path, crop_data['left'], crop_data['top'], crop_data['right'], crop_data['bottom'])
+                applied_ops.append('crop')
+
+            if 'resize' in operations_dict:
+                resize_data = operations_dict['resize']
+                out_path = resize_image(out_path, width=resize_data.get('width'), height=resize_data.get('height'))
+                applied_ops.append('resize')
+
+            if operations_dict.get('rotate', 0):
+                out_path = rotate_image(out_path, operations_dict['rotate'])
+                applied_ops.append('rotate')
+
+            if 'filter' in operations_dict:
+                filter_data = operations_dict['filter']
+                out_path = apply_filter(out_path, filter_data['type'], filter_data['value'])
+                applied_ops.append('filter')
+
+            if 'overlay_text' in operations_dict:
+                text_data = operations_dict['overlay_text']
+                out_path = overlay_text(out_path, text_data['text'], text_data['x'], text_data['y'], text_data['font_size'])
+                applied_ops.append('overlay_text')
+
+            results.append({
+                'asset_id': asset_id,
+                'status': 'success',
+                'result_path': out_path,
+                'applied_operations': applied_ops
+            })
+
+        logger.info(f'Batch manipulated {len(asset_ids_list)} assets')
+        return {'results': results, 'total_processed': len(results)}
+    except Exception as e:
+        logger.exception('Batch manipulation failed')
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/batch_validate')
+async def batch_validate(asset_ids: str = Form(...)):
+    """
+    Validate multiple assets in batch
+    """
+    try:
+        asset_ids_list = [int(x.strip()) for x in asset_ids.split(',')]
+        results = []
+
+        for asset_id in asset_ids_list:
+            path = get_asset_path(DB_PATH, asset_id)
+            if not path:
+                results.append({'asset_id': asset_id, 'status': 'error', 'message': 'Asset not found'})
+                continue
+
+            issues = validate_image_guidelines(path)
+            results.append({
+                'asset_id': asset_id,
+                'status': 'success',
+                'issues': issues,
+                'compliant': len(issues) == 0
+            })
+
+        logger.info(f'Batch validated {len(asset_ids_list)} assets')
+        return {'results': results, 'total_validated': len(results)}
+    except Exception as e:
+        logger.exception('Batch validation failed')
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/analyze_image')
+async def analyze_image(asset_id: int = Form(...)):
+    """
+    AI-powered image analysis including auto-tagging and object detection
+    """
+    try:
+        path = get_asset_path(DB_PATH, asset_id)
+        if not path:
+            raise HTTPException(status_code=404, detail='Asset not found')
+
+        # Basic image analysis using OpenCV
+        image = cv2.imread(path)
+        height, width = image.shape[:2]
+
+        # Color analysis
+        avg_color = cv2.mean(image)[:3]
+        avg_color_rgb = tuple(reversed([int(c) for c in avg_color]))
+
+        # Brightness analysis
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        brightness = np.mean(hsv[:, :, 2])
+
+        # Edge detection for complexity
+        edges = cv2.Canny(image, 100, 200)
+        complexity = np.sum(edges > 0) / (height * width)
+
+        # OCR for text detection
+        try:
+            text_content = pytesseract.image_to_string(image)
+            has_text = len(text_content.strip()) > 0
+        except:
+            text_content = ""
+            has_text = False
+
+        analysis = {
+            'dimensions': {'width': width, 'height': height},
+            'average_color': avg_color_rgb,
+            'brightness': float(brightness),
+            'complexity_score': float(complexity),
+            'has_text': has_text,
+            'extracted_text': text_content[:500] if text_content else "",  # Limit text length
+            'file_size_kb': os.path.getsize(path) / 1024,
+            'aspect_ratio': width / height if height > 0 else 0
+        }
+
+        # Auto-tagging based on analysis
+        tags = []
+        if brightness < 50:
+            tags.append('dark')
+        elif brightness > 200:
+            tags.append('bright')
+
+        if complexity < 0.01:
+            tags.append('simple')
+        elif complexity > 0.1:
+            tags.append('complex')
+
+        if has_text:
+            tags.append('text_overlay')
+
+        # Color-based tags
+        r, g, b = avg_color_rgb
+        if r > g and r > b:
+            tags.append('red_tone')
+        elif g > r and g > b:
+            tags.append('green_tone')
+        elif b > r and b > g:
+            tags.append('blue_tone')
+
+        analysis['auto_tags'] = tags
+
+        logger.info(f'Analyzed image {asset_id}: {analysis}')
+        return analysis
+    except Exception as e:
+        logger.exception(f'Image analysis failed for asset {asset_id}')
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Authentication endpoints
+@app.post('/register')
+async def register(username: str = Form(...), password: str = Form(...), email: str = Form(None)):
+    """Register a new user"""
+    try:
+        # In production, store users in database
+        # For demo, we'll use a simple file-based storage
+        users_file = os.path.join(BASE_DIR, 'users.json')
+        if os.path.exists(users_file):
+            with open(users_file, 'r') as f:
+                users = json.load(f)
+        else:
+            users = {}
+
+        if username in users:
+            raise HTTPException(status_code=400, detail="Username already exists")
+
+        users[username] = {
+            'password_hash': hash_password(password),
+            'email': email,
+            'created_at': time.time(),
+            'role': 'user'
+        }
+
+        with open(users_file, 'w') as f:
+            json.dump(users, f)
+
+        logger.info(f'User registered: {username}')
+        return {'message': 'User registered successfully'}
+    except Exception as e:
+        logger.exception('Registration failed')
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/login')
+async def login(username: str = Form(...), password: str = Form(...)):
+    """Authenticate user and return JWT token"""
+    try:
+        users_file = os.path.join(BASE_DIR, 'users.json')
+        if not os.path.exists(users_file):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        with open(users_file, 'r') as f:
+            users = json.load(f)
+
+        if username not in users or not verify_password(password, users[username]['password_hash']):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        access_token = create_access_token(data={"sub": username, "role": users[username]['role']})
+        logger.info(f'User logged in: {username}')
+        return {
+            'access_token': access_token,
+            'token_type': 'bearer',
+            'expires_in': JWT_EXPIRATION_HOURS * 3600
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception('Login failed')
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get('/me')
+async def get_current_user(current_user: dict = Depends(verify_token)):
+    """Get current user information"""
+    return {
+        'username': current_user['sub'],
+        'role': current_user.get('role', 'user')
+    }
+
+@app.post('/change_password')
+async def change_password(
+    old_password: str = Form(...),
+    new_password: str = Form(...),
+    current_user: dict = Depends(verify_token)
+):
+    """Change user password"""
+    try:
+        users_file = os.path.join(BASE_DIR, 'users.json')
+        with open(users_file, 'r') as f:
+            users = json.load(f)
+
+        username = current_user['sub']
+        if not verify_password(old_password, users[username]['password_hash']):
+            raise HTTPException(status_code=400, detail="Invalid old password")
+
+        users[username]['password_hash'] = hash_password(new_password)
+
+        with open(users_file, 'w') as f:
+            json.dump(users, f)
+
+        logger.info(f'Password changed for user: {username}')
+        return {'message': 'Password changed successfully'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception('Password change failed')
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Version control endpoints
+@app.get('/asset/{asset_id}/versions')
+async def get_asset_version_history(asset_id: int, current_user: dict = Depends(verify_token)):
+    """Get version history for an asset"""
+    try:
+        versions = get_asset_versions(DB_PATH, asset_id)
+        return {'versions': versions}
+    except Exception as e:
+        logger.exception(f'Failed to get versions for asset {asset_id}')
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get('/asset/{asset_id}/version/{version}')
+async def get_asset_version(asset_id: int, version: int, current_user: dict = Depends(verify_token)):
+    """Get specific version of an asset"""
+    try:
+        path = get_asset_path(DB_PATH, asset_id, version)
+        if not path or not os.path.exists(path):
+            raise HTTPException(status_code=404, detail='Version not found')
+        return FileResponse(path, media_type='image/png')
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f'Failed to get version {version} for asset {asset_id}')
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/asset/{asset_id}/comment')
+async def add_comment_to_asset(
+    asset_id: int,
+    comment: str = Form(...),
+    version_id: int = Form(None),
+    current_user: dict = Depends(verify_token)
+):
+    """Add a comment to an asset or specific version"""
+    try:
+        comment_id = add_asset_comment(DB_PATH, asset_id, comment, version_id, current_user['sub'])
+        return {'comment_id': comment_id, 'message': 'Comment added successfully'}
+    except Exception as e:
+        logger.exception(f'Failed to add comment to asset {asset_id}')
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get('/asset/{asset_id}/comments')
+async def get_asset_comments_endpoint(asset_id: int, current_user: dict = Depends(verify_token)):
+    """Get comments for an asset"""
+    try:
+        comments = get_asset_comments(DB_PATH, asset_id)
+        return {'comments': comments}
+    except Exception as e:
+        logger.exception(f'Failed to get comments for asset {asset_id}')
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/asset/{asset_id}/restore/{version}')
+async def restore_asset_version(
+    asset_id: int,
+    version: int,
+    current_user: dict = Depends(verify_token)
+):
+    """Restore asset to a previous version"""
+    try:
+        # Get the path of the version to restore
+        version_path = get_asset_path(DB_PATH, asset_id, version)
+        if not version_path:
+            raise HTTPException(status_code=404, detail='Version not found')
+
+        # Create a copy of the version as new current version
+        import shutil
+        new_path = version_path.replace('.png', f'_restored_v{version}_{int(time.time())}.png')
+        shutil.copy2(version_path, new_path)
+
+        # Save as new version
+        new_version = save_asset_version(DB_PATH, asset_id, new_path, 'restore', json.dumps({'restored_from': version}), current_user['sub'])
+
+        return {'new_version': new_version, 'message': f'Asset restored to version {version}'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f'Failed to restore asset {asset_id} to version {version}')
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get('/export_report')
 def export_report():
