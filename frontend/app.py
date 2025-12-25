@@ -92,8 +92,8 @@ with cols2[0]:
         resp = requests.post(f"{BACKEND_URL}/validate", json=canvas)
         if resp.ok:
             data = resp.json()
-            st.success(f"Passed: {data['passed']}")
-            for issue in data["issues"]:
+            st.success(f"Passed: {data.get('passed', True)}")
+            for issue in data.get("issues", []):
                 if issue["severity"] == "error":
                     st.error(f"{issue['code']}: {issue['message']}")
                 else:

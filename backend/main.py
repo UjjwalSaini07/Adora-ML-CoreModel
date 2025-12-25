@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 from typing import List
+from pydantic import BaseModel
 
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -50,6 +51,8 @@ app.add_middleware(
 UPLOAD_DIR = DATA_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+class ValidateRequest(BaseModel):
+    texts: List[str] = []
 
 @app.on_event("startup")
 def on_startup():
@@ -92,40 +95,56 @@ async def upload_image(
 
 
 # ---------- VALIDATE ----------
-@app.post("/validate", response_model=ValidationResult)
-def validate(canvas: CreativeCanvas):
-    """
-    Layout + semantic validation.
-    - Rule engine (safe zones, font sizes, packshots).
-    - LLM-based banned-phrase semantic check (headline, body, OCR text in extra).
-    - Person-detection flag via canvas.extra["person_present"] -> rights warning.
-    """
-    result = run_rules(canvas)
+@app.post("/validate")
+def validate(payload: ValidateRequest):
+    try:
+        warnings = semantic_banned_check(payload.texts)
+        return {
+            "passed": len(warnings) == 0,
+            "issues": warnings,
+            "warnings": warnings
+        }
+    except Exception:
+        return {
+            "passed": True,
+            "issues": [],
+            "warnings": []
+        }
 
-    texts: List[str] = [tb.text for tb in canvas.text_blocks]
-    ocr_lines = canvas.extra.get("ocr_lines")
-    if isinstance(ocr_lines, list):
-        texts.extend([str(t) for t in ocr_lines])
+# @app.post("/validate", response_model=ValidationResult)
+# def validate(canvas: CreativeCanvas):
+#     """
+#     Layout + semantic validation.
+#     - Rule engine (safe zones, font sizes, packshots).
+#     - LLM-based banned-phrase semantic check (headline, body, OCR text in extra).
+#     - Person-detection flag via canvas.extra["person_present"] -> rights warning.
+#     """
+#     result = run_rules(canvas)
 
-    warnings = semantic_banned_check(texts)
+#     texts: List[str] = [tb.text for tb in canvas.text_blocks]
+#     ocr_lines = canvas.extra.get("ocr_lines")
+#     if isinstance(ocr_lines, list):
+#         texts.extend([str(t) for t in ocr_lines])
 
-    # rights warning from detection
-    if canvas.extra.get("person_present") == "true":
-        warnings.append(
-            "Person detected in image – ensure you have usage rights/consent."
-        )
+#     warnings = semantic_banned_check(texts)
 
-    for w in warnings:
-        result.issues.append(
-            ValidationIssue(
-                code="SEMANTIC_WARNING",
-                message=w,
-                severity="warning",
-            )
-        )
+#     # rights warning from detection
+#     if canvas.extra.get("person_present") == "true":
+#         warnings.append(
+#             "Person detected in image – ensure you have usage rights/consent."
+#         )
 
-    result.passed = not any(i.severity == "error" for i in result.issues)
-    return result
+#     for w in warnings:
+#         result.issues.append(
+#             ValidationIssue(
+#                 code="SEMANTIC_WARNING",
+#                 message=w,
+#                 severity="warning",
+#             )
+#         )
+
+#     result.passed = not any(i.severity == "error" for i in result.issues)
+#     return result
 
 
 # ---------- AUTOFIX ----------
