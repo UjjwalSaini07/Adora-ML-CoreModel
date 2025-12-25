@@ -13,7 +13,7 @@ build/
 
 *.log
 *chroma_db
-
 *data
 
-yolov8n.pt
+storage/
+temp/
