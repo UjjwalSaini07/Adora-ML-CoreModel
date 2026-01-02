@@ -5,7 +5,7 @@ import time
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend
+matplotlib.use('Agg')
 
 # Configure matplotlib for better Unicode support
 plt.rcParams['font.family'] = 'sans-serif'
@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore", message=".*findfont: Font family.*not found.*"
 
 import numpy as np
 
-BACKEND_URL = 'http://localhost:8000'
+BACKEND_URL = os.getenv('BACKEND_URL', 'http://localhost:8000')
 
 # Authentication state management
 if 'auth_token' not in st.session_state:
