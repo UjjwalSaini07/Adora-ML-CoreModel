@@ -4,6 +4,18 @@ from PIL import Image
 import time
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+
+# Configure matplotlib for better Unicode support
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['axes.unicode_minus'] = False
+
+# Suppress specific matplotlib font warnings
+import warnings
+warnings.filterwarnings("ignore", message=".*Glyph.*missing from font.*")
+warnings.filterwarnings("ignore", message=".*findfont: Font family.*not found.*")
+
 import numpy as np
 
 BACKEND_URL = 'http://localhost:8000'
@@ -343,7 +355,7 @@ if st.session_state.current_page == 'Dashboard':
             ax.axhline(y=avg_daily, color='#10b981', linestyle='--', alpha=0.7, linewidth=2, label=f'Average: {avg_daily:.1f}')
             ax.axhline(y=max_count, color='#ef4444', linestyle=':', alpha=0.7, linewidth=2, label=f'Peak: {max_count}')
 
-            ax.set_title(f'📊 Comprehensive Daily Upload Trends & Performance Metrics\nTotal Assets: {total_uploads} | Daily Average: {avg_daily:.1f} | Performance Range: {min_count}-{max_count} uploads',
+            ax.set_title(f'Analytics: Comprehensive Daily Upload Trends & Performance Metrics\nTotal Assets: {total_uploads} | Daily Average: {avg_daily:.1f} | Performance Range: {min_count}-{max_count} uploads',
                         fontsize=20, fontweight='bold', pad=35, color='#1e293b')
             ax.set_xlabel('Date', fontsize=14, fontweight='medium')
             ax.set_ylabel('Assets Uploaded', fontsize=14, fontweight='medium')
@@ -446,7 +458,7 @@ if st.session_state.current_page == 'Dashboard':
                             bbox=dict(boxstyle='round,pad=0.4', facecolor='yellow', alpha=0.9),
                             fontsize=11, fontweight='bold', ha='left')
 
-                ax1.set_title(f'📊 Comprehensive Weekly Upload Pattern & Performance Analysis\nTotal: {total_weekly} uploads | Average: {avg_weekly:.1f} per day | Peak Performance: {peak_day}',
+                ax1.set_title(f'Analytics: Comprehensive Weekly Upload Pattern & Performance Analysis\nTotal: {total_weekly} uploads | Average: {avg_weekly:.1f} per day | Peak Performance: {peak_day}',
                              fontsize=18, fontweight='bold', pad=30, color='#1e293b')
                 ax1.set_xlabel('Day of Week', fontsize=14, fontweight='medium')
                 ax1.set_ylabel('Upload Count', fontsize=14, fontweight='medium')
@@ -753,7 +765,7 @@ if st.session_state.current_page == 'Dashboard':
                         ax.fill_betweenx([0, max(n)], mean_size - std_size, mean_size + std_size,
                                        alpha=0.15, color='#ef4444', label='±1 Std Dev')
 
-                        ax.set_title(f'📊 Comprehensive File Size Distribution Analysis\n{len(sizes)} Assets Analyzed | σ={std_size:.1f} KB | Range: {min(sizes):.1f}-{max(sizes):.1f} KB',
+                        ax.set_title(f'Analytics: Comprehensive File Size Distribution Analysis\n{len(sizes)} Assets Analyzed | σ={std_size:.1f} KB | Range: {min(sizes):.1f}-{max(sizes):.1f} KB',
                                    fontsize=16, fontweight='bold', pad=30, color='#1e293b')
                         ax.set_xlabel('File Size (KB)', fontsize=14, fontweight='medium')
                         ax.set_ylabel('Asset Count', fontsize=14, fontweight='medium')
@@ -887,7 +899,7 @@ if st.session_state.current_page == 'Dashboard':
                 max_latency = max(latency_data) if latency_data else 245
                 min_latency = min(latency_data) if latency_data else 245
 
-                ax.set_title(f'🔴 Live API Response Latency\nCurrent: {current_latency:.0f}ms | Average: {avg_latency:.0f}ms | Range: {min_latency:.0f}-{max_latency:.0f}ms',
+                ax.set_title(f'Monitoring: Live API Response Latency\nCurrent: {current_latency:.0f}ms | Average: {avg_latency:.0f}ms | Range: {min_latency:.0f}-{max_latency:.0f}ms',
                             fontsize=14, fontweight='bold', pad=25, color='#1e293b')
                 ax.set_xlabel('Time (Rolling 50 Minutes)', fontsize=12)
                 ax.set_ylabel('Response Time (ms)', fontsize=12)
