@@ -820,7 +820,7 @@ if st.session_state.current_page == 'Dashboard':
             with col_lat_refresh:
                 refresh_latency = st.button('🔄 Refresh Latency', help='Update latency data', use_container_width=True)
             with col_lat_auto:
-                auto_update_latency = st.checkbox('Auto Update Latency', value=True, help='Automatically refresh latency every 5 seconds')
+                auto_update_latency = st.checkbox('Auto Update Latency', value=False, help='Automatically refresh latency every 5 seconds (disabled by default to prevent screen freezing)')
             with col_lat_status:
                 if 'latency_last_update' not in st.session_state:
                     st.session_state.latency_last_update = time.time()
@@ -830,12 +830,9 @@ if st.session_state.current_page == 'Dashboard':
                 else:
                     st.warning(f'⚠️ Latency update due - {int(latency_time_since)}s ago')
 
-            # Force refresh if button clicked or auto-update triggered
-            if refresh_latency or (auto_update_latency and latency_time_since >= 5):
+            # Force refresh only if button clicked (removed auto-update to prevent freezing)
+            if refresh_latency:
                 st.session_state.latency_last_update = time.time()
-                if auto_update_latency:
-                    time.sleep(0.1)
-                    st.rerun()
 
             # Create placeholders for live latency updates
             latency_chart_placeholder = st.empty()
