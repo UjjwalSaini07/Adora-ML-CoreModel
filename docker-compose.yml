@@ -1,28 +1,73 @@
-version: "3.9"
-
 services:
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.backend
     container_name: adora_backend
-    command: uvicorn backend.utils.main:app --host 0.0.0.0 --port 8000
-    ports:
-      - "8000:8000"
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
+      - BASE_DIR=/app/storage
+      - LOG_DIR=/app/storage/logs
+      - DB_PATH=/app/storage/assets.db
+      - USE_GPU=false
+      - ENVIRONMENT=production
     volumes:
-      - .:/app 
+      - ./storage:/app/storage
+    networks:
+      - adora_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/system_health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
-    build: .
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.frontend
     container_name: adora_frontend
-    command: streamlit run frontend/app.py --server.port 8501 --server.address 0.0.0.0
-    ports:
-      - "8501:8501"
-    depends_on:
-      - backend
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
-    volumes:
-      - .:/app
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - adora_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    container_name: adora_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - adora_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  adora_network:
+    driver: bridge
+
+volumes:
+  storage:
+    driver: local
