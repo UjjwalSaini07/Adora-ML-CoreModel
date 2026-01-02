@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import uvicorn
 import os
+from dotenv import load_dotenv
 from db import init_db, save_asset, list_assets, get_asset_path, save_asset_version, get_asset_versions, add_asset_comment, get_asset_comments
 from utils import save_upload_file_temp, remove_background, resize_image, rotate_image, crop_image, apply_filter, overlay_text
 from guidelines import validate_creative_rules, validate_image_guidelines
@@ -27,39 +28,92 @@ from diffusers import DiffusionPipeline
 from transformers import pipeline
 from PIL import Image
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Load configuration from environment variables
+load_dotenv()
+
 # Authentication configuration
-JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key-change-in-production')
-JWT_ALGORITHM = 'HS256'
-JWT_EXPIRATION_HOURS = 24
+JWT_SECRET = os.getenv('JWT_SECRET', 'UMrSzNvT5Lt9YXgbJtuSf8pO5KCpjOGKK81dRWxG8tYeHK7bm')
+JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
+JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
 
 security = HTTPBearer()
 
-BASE_DIR = Path(__file__).resolve().parent.parent / "storage"
+# Directory configuration
+BASE_DIR = Path(os.getenv('BASE_DIR', Path(__file__).resolve().parent.parent / "storage"))
 LOG_DIR = os.getenv('LOG_DIR', str(BASE_DIR / "logs"))
+DB_PATH = os.getenv('DB_PATH', str(BASE_DIR / "assets.db"))
+
+# Create necessary directories
+os.makedirs(BASE_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
+
+# Logging configuration
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+LOG_MAX_SIZE = int(os.getenv('LOG_MAX_SIZE', '5242880'))  # 5MB default
+LOG_BACKUP_COUNT = int(os.getenv('LOG_BACKUP_COUNT', '3'))
+
 logger = logging.getLogger('creative_tool')
-logger.setLevel(logging.INFO)
-handler = RotatingFileHandler(os.path.join(LOG_DIR, 'app.log'), maxBytes=5_000_000, backupCount=3)
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+
+handler = RotatingFileHandler(
+    os.path.join(LOG_DIR, 'app.log'),
+    maxBytes=LOG_MAX_SIZE,
+    backupCount=LOG_BACKUP_COUNT
+)
 fmt = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(fmt)
 logger.addHandler(handler)
 
-app = FastAPI(title='Retail Media Creative Tool Prototype')
+# FastAPI application configuration
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+DEBUG = os.getenv('DEBUG', 'true').lower() == 'true'
+
+app = FastAPI(
+    title='Adora ML Core Model - Retail Media Creative Tool',
+    description='AI-powered creative validation, layout correction, and ad rendering platform',
+    version='1.0.0',
+    debug=DEBUG
+)
+
+# CORS configuration
+CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*')
+if CORS_ORIGINS == '*':
+    allow_origins = ['*']
+else:
+    allow_origins = [origin.strip() for origin in CORS_ORIGINS.split(',')]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
 )
 
-# Initialize DB
-DB_PATH = os.getenv('DB_PATH', str(BASE_DIR / "assets.db"))
+# Initialize database
 init_db(DB_PATH)
+logger.info(f'Database initialized at: {DB_PATH}')
 
-# Check for CUDA
-GPU_AVAILABLE = torch.cuda.is_available() if 'torch' in globals() else False
-logger.info(f'GPU available: {GPU_AVAILABLE}')
+# GPU configuration
+USE_GPU = os.getenv('USE_GPU', 'true').lower() == 'true'
+GPU_AVAILABLE = torch.cuda.is_available() if USE_GPU else False
+logger.info(f'GPU available: {GPU_AVAILABLE}, GPU enabled: {USE_GPU}')
+
+# Performance and limits configuration
+MAX_UPLOAD_SIZE = int(os.getenv('MAX_UPLOAD_SIZE', '10485760'))  # 10MB default
+BATCH_LIMIT = int(os.getenv('BATCH_LIMIT', '50'))
+AI_TIMEOUT = int(os.getenv('AI_TIMEOUT', '300'))
+
+# Feature flags
+ENABLE_ADVANCED_AI = os.getenv('ENABLE_ADVANCED_AI', 'true').lower() == 'true'
+ENABLE_BATCH_OPERATIONS = os.getenv('ENABLE_BATCH_OPERATIONS', 'true').lower() == 'true'
+ENABLE_VERSION_CONTROL = os.getenv('ENABLE_VERSION_CONTROL', 'true').lower() == 'true'
+ENABLE_COMMENTS = os.getenv('ENABLE_COMMENTS', 'true').lower() == 'true'
+
+logger.info('Application configuration loaded successfully')
 
 # Initialize models
 device = "cuda" if GPU_AVAILABLE else "cpu"
