@@ -12,3 +12,7 @@ onnxruntime
 pandas
 pyjwt
 bcrypt
+diffusers
+transformers
+accelerate
+python-dotenv

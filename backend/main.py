@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import uvicorn
 import os
+from dotenv import load_dotenv
 from db import init_db, save_asset, list_assets, get_asset_path, save_asset_version, get_asset_versions, add_asset_comment, get_asset_comments
 from utils import save_upload_file_temp, remove_background, resize_image, rotate_image, crop_image, apply_filter, overlay_text
 from guidelines import validate_creative_rules, validate_image_guidelines
@@ -23,40 +24,118 @@ import bcrypt
 from datetime import datetime, timedelta
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Depends, Security
+from diffusers import DiffusionPipeline
+from transformers import pipeline
+from PIL import Image
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Load configuration from environment variables
+load_dotenv()
 
 # Authentication configuration
-JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key-change-in-production')
-JWT_ALGORITHM = 'HS256'
-JWT_EXPIRATION_HOURS = 24
+JWT_SECRET = os.getenv('JWT_SECRET', 'UMrSzNvT5Lt9YXgbJtuSf8pO5KCpjOGKK81dRWxG8tYeHK7bm')
+JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
+JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
 
 security = HTTPBearer()
 
-BASE_DIR = Path(__file__).resolve().parent.parent / "storage"
+# Directory configuration
+BASE_DIR = Path(os.getenv('BASE_DIR', Path(__file__).resolve().parent.parent / "storage"))
 LOG_DIR = os.getenv('LOG_DIR', str(BASE_DIR / "logs"))
+DB_PATH = os.getenv('DB_PATH', str(BASE_DIR / "assets.db"))
+
+# Create necessary directories
+os.makedirs(BASE_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
+
+# Logging configuration
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+LOG_MAX_SIZE = int(os.getenv('LOG_MAX_SIZE', '5242880'))  # 5MB default
+LOG_BACKUP_COUNT = int(os.getenv('LOG_BACKUP_COUNT', '3'))
+
 logger = logging.getLogger('creative_tool')
-logger.setLevel(logging.INFO)
-handler = RotatingFileHandler(os.path.join(LOG_DIR, 'app.log'), maxBytes=5_000_000, backupCount=3)
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+
+handler = RotatingFileHandler(
+    os.path.join(LOG_DIR, 'app.log'),
+    maxBytes=LOG_MAX_SIZE,
+    backupCount=LOG_BACKUP_COUNT
+)
 fmt = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(fmt)
 logger.addHandler(handler)
 
-app = FastAPI(title='Retail Media Creative Tool Prototype')
+# FastAPI application configuration
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+DEBUG = os.getenv('DEBUG', 'true').lower() == 'true'
+
+app = FastAPI(
+    title='Adora ML Core Model - Retail Media Creative Tool',
+    description='AI-powered creative validation, layout correction, and ad rendering platform',
+    version='1.0.0',
+    debug=DEBUG
+)
+
+# CORS configuration
+CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*')
+if CORS_ORIGINS == '*':
+    allow_origins = ['*']
+else:
+    allow_origins = [origin.strip() for origin in CORS_ORIGINS.split(',')]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
 )
 
-# Initialize DB
-DB_PATH = os.getenv('DB_PATH', str(BASE_DIR / "assets.db"))
+# Initialize database
 init_db(DB_PATH)
+logger.info(f'Database initialized at: {DB_PATH}')
 
-# Check for CUDA
-GPU_AVAILABLE = torch.cuda.is_available() if 'torch' in globals() else False
-logger.info(f'GPU available: {GPU_AVAILABLE}')
+# GPU configuration
+USE_GPU = os.getenv('USE_GPU', 'true').lower() == 'true'
+GPU_AVAILABLE = torch.cuda.is_available() if USE_GPU else False
+logger.info(f'GPU available: {GPU_AVAILABLE}, GPU enabled: {USE_GPU}')
+
+# Performance and limits configuration
+MAX_UPLOAD_SIZE = int(os.getenv('MAX_UPLOAD_SIZE', '10485760'))  # 10MB default
+BATCH_LIMIT = int(os.getenv('BATCH_LIMIT', '50'))
+AI_TIMEOUT = int(os.getenv('AI_TIMEOUT', '300'))
+
+# Feature flags
+ENABLE_ADVANCED_AI = os.getenv('ENABLE_ADVANCED_AI', 'true').lower() == 'true'
+ENABLE_BATCH_OPERATIONS = os.getenv('ENABLE_BATCH_OPERATIONS', 'true').lower() == 'true'
+ENABLE_VERSION_CONTROL = os.getenv('ENABLE_VERSION_CONTROL', 'true').lower() == 'true'
+ENABLE_COMMENTS = os.getenv('ENABLE_COMMENTS', 'true').lower() == 'true'
+
+logger.info('Application configuration loaded successfully')
+
+# Initialize models
+device = "cuda" if GPU_AVAILABLE else "cpu"
+try:
+    object_detector = pipeline("object-detection", model="facebook/detr-resnet-50", device=device)
+    logger.info("Object detection model loaded")
+except Exception as e:
+    logger.warning(f"Failed to load object detection model: {e}")
+    object_detector = None
+
+try:
+    stable_diffusion_pipe = DiffusionPipeline.from_pretrained(
+        "stabilityai/stable-diffusion-xl-base-1.0",
+        torch_dtype=torch.float16 if GPU_AVAILABLE else torch.float32,
+        use_safetensors=True,
+        variant="fp16" if GPU_AVAILABLE else None
+    )
+    stable_diffusion_pipe.to(device)
+    logger.info("Stable Diffusion model loaded")
+except Exception as e:
+    logger.warning(f"Failed to load Stable Diffusion model: {e}")
+    stable_diffusion_pipe = None
 
 # Authentication functions
 def hash_password(password: str) -> str:
@@ -404,6 +483,23 @@ async def analyze_image(asset_id: int = Form(...), current_user: dict = Depends(
             text_content = ""
             has_text = False
 
+        # Object detection
+        detected_objects = []
+        detected_people = []
+        if object_detector:
+            try:
+                pil_image = Image.open(path)
+                detections = object_detector(pil_image)
+                for detection in detections:
+                    label = detection['label']
+                    score = detection['score']
+                    if score > 0.5:  # Confidence threshold
+                        detected_objects.append({'label': label, 'confidence': score})
+                        if label == 'person':
+                            detected_people.append({'confidence': score})
+            except Exception as e:
+                logger.warning(f"Object detection failed: {e}")
+
         analysis = {
             'dimensions': {'width': width, 'height': height},
             'average_color': avg_color_rgb,
@@ -412,7 +508,10 @@ async def analyze_image(asset_id: int = Form(...), current_user: dict = Depends(
             'has_text': has_text,
             'extracted_text': text_content[:500] if text_content else "",  # Limit text length
             'file_size_kb': os.path.getsize(path) / 1024,
-            'aspect_ratio': width / height if height > 0 else 0
+            'aspect_ratio': width / height if height > 0 else 0,
+            'detected_objects': detected_objects,
+            'detected_people': detected_people,
+            'restricted_content': len(detected_people) > 0  # Flag if people detected
         }
 
         # Auto-tagging based on analysis
@@ -439,12 +538,166 @@ async def analyze_image(asset_id: int = Form(...), current_user: dict = Depends(
         elif b > r and b > g:
             tags.append('blue_tone')
 
+        # Object-based tags
+        for obj in detected_objects:
+            tags.append(obj['label'])
+
         analysis['auto_tags'] = tags
 
         logger.info(f'Analyzed image {asset_id}: {analysis}')
         return analysis
     except Exception as e:
         logger.exception(f'Image analysis failed for asset {asset_id}')
+        raise HTTPException(status_code=500, detail=str(e))
+
+def generate_marketing_text(analysis):
+    """
+    Generate marketing text based on image analysis
+    """
+    text = analysis.get('extracted_text', '').strip()
+    objects = [obj['label'] for obj in analysis.get('detected_objects', [])]
+    has_people = len(analysis.get('detected_people', [])) > 0
+
+    # Simple template-based generation
+    if 'bottle' in objects or 'container' in text.lower():
+        product_type = "beverage"
+    elif 'food' in objects or 'snack' in text.lower():
+        product_type = "snack"
+    else:
+        product_type = "product"
+
+    headline = f"Discover the Perfect {product_type.title()} for You!"
+    subhead = f"Premium quality {product_type} with exceptional taste."
+    caveat = "Terms and conditions apply. See packaging for details."
+
+    return {
+        'headline': headline,
+        'subhead': subhead,
+        'caveat': caveat,
+        'tags': objects
+    }
+
+def generate_image_with_sd(prompt, negative_prompt="blurry, low quality, distorted"):
+    """
+    Generate image using Stable Diffusion
+    """
+    if not stable_diffusion_pipe:
+        raise Exception("Stable Diffusion model not loaded")
+
+    try:
+        image = stable_diffusion_pipe(prompt=prompt, negative_prompt=negative_prompt).images[0]
+        return image
+    except Exception as e:
+        logger.error(f"Image generation failed: {e}")
+        raise
+
+def evaluate_generated_image(image, format_type):
+    """
+    Evaluate generated image for quality metrics
+    """
+    # Convert PIL to numpy
+    img_array = np.array(image)
+
+    # Basic evaluations
+    height, width = img_array.shape[:2]
+
+    # Brightness
+    hsv = cv2.cvtColor(img_array, cv2.COLOR_RGB2HSV)
+    brightness = np.mean(hsv[:, :, 2])
+
+    # Contrast (std dev of brightness)
+    contrast = np.std(hsv[:, :, 2])
+
+    # Text readability (placeholder - assume good if not too dark)
+    readable = brightness > 100
+
+    # Layout balance (center mass)
+    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    moments = cv2.moments(gray)
+    if moments["m00"] != 0:
+        cx = int(moments["m10"] / moments["m00"])
+        cy = int(moments["m01"] / moments["m00"])
+        center_balance = abs(cx - width//2) + abs(cy - height//2)
+    else:
+        center_balance = 0
+
+    # Safe zones (assume 10% margins)
+    safe_zone_violation = (cx < width*0.1 or cx > width*0.9 or cy < height*0.1 or cy > height*0.9)
+
+    return {
+        'brightness': float(brightness),
+        'contrast': float(contrast),
+        'text_readable': readable,
+        'layout_balance_score': float(center_balance),
+        'safe_zone_compliant': not safe_zone_violation,
+        'platform_suitable': format_type in ['story', 'feed', 'banner']
+    }
+
+@app.post('/generate_ad_assets')
+async def generate_ad_assets(asset_id: int = Form(...), current_user: dict = Depends(verify_token)):
+    """
+    Generate advertising assets based on packshot analysis
+    """
+    try:
+        # First, analyze the image
+        analysis_response = await analyze_image(asset_id, current_user)
+        analysis = analysis_response
+
+        if analysis.get('restricted_content'):
+            raise HTTPException(status_code=400, detail="Image contains restricted content (people detected)")
+
+        # Generate marketing text
+        marketing_text = generate_marketing_text(analysis)
+
+        # Generate images for different formats
+        formats = {
+            'story': {'size': (1080, 1920), 'aspect': 9/16},  # Vertical
+            'feed': {'size': (1080, 1080), 'aspect': 1},      # Square
+            'banner': {'size': (1200, 628), 'aspect': 1200/628}  # Horizontal
+        }
+
+        generated_assets = {}
+        image_generation_dir = os.path.join(BASE_DIR, 'image_generation')
+        os.makedirs(image_generation_dir, exist_ok=True)
+
+        for format_name, specs in formats.items():
+            prompt = f"A high-quality advertisement for {marketing_text['headline']} {marketing_text['subhead']}, professional {format_name} format, clean design"
+            try:
+                image = generate_image_with_sd(prompt)
+                # Resize to format
+                image = image.resize(specs['size'], Image.LANCZOS)
+
+                # Evaluate
+                evaluation = evaluate_generated_image(image, format_name)
+
+                # Save
+                filename = f"{asset_id}_{format_name}_{int(time.time())}.png"
+                filepath = os.path.join(image_generation_dir, filename)
+                image.save(filepath)
+
+                generated_assets[format_name] = {
+                    'path': filepath,
+                    'evaluation': evaluation,
+                    'filename': filename
+                }
+
+            except Exception as e:
+                logger.error(f"Failed to generate {format_name}: {e}")
+                generated_assets[format_name] = {'error': str(e)}
+
+        result = {
+            'analysis': analysis,
+            'marketing_text': marketing_text,
+            'generated_assets': generated_assets
+        }
+
+        logger.info(f'Generated ad assets for {asset_id}')
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f'Ad asset generation failed for asset {asset_id}')
         raise HTTPException(status_code=500, detail=str(e))
 
 # Authentication endpoints

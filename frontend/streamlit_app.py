@@ -219,9 +219,9 @@ st.sidebar.subheader('Navigation')
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 'Dashboard'
 
-nav_options = ['Dashboard', 'Asset Library', 'Image Editor', 'AI Analysis', 'Version History', 'Compliance Check']
+nav_options = ['Dashboard', 'Asset Library', 'Image Editor', 'AI Analysis', 'AI Creative Assistant', 'Version History', 'Compliance Check']
 for option in nav_options:
-    icon = {'Dashboard': '📊', 'Asset Library': '🖼️', 'Image Editor': '✏️', 'AI Analysis': '🤖', 'Version History': '📚', 'Compliance Check': '✅'}[option]
+    icon = {'Dashboard': '📊', 'Asset Library': '🖼️', 'Image Editor': '✏️', 'AI Analysis': '🤖', 'AI Creative Assistant': '🎨', 'Version History': '📚', 'Compliance Check': '✅'}[option]
     if st.sidebar.button(
         f"{icon} {option}",
         key=f"nav_{option}",
@@ -820,7 +820,7 @@ if st.session_state.current_page == 'Dashboard':
             with col_lat_refresh:
                 refresh_latency = st.button('🔄 Refresh Latency', help='Update latency data', use_container_width=True)
             with col_lat_auto:
-                auto_update_latency = st.checkbox('Auto Update Latency', value=True, help='Automatically refresh latency every 5 seconds')
+                auto_update_latency = st.checkbox('Auto Update Latency', value=False, help='Automatically refresh latency every 5 seconds (disabled by default to prevent screen freezing)')
             with col_lat_status:
                 if 'latency_last_update' not in st.session_state:
                     st.session_state.latency_last_update = time.time()
@@ -830,12 +830,9 @@ if st.session_state.current_page == 'Dashboard':
                 else:
                     st.warning(f'⚠️ Latency update due - {int(latency_time_since)}s ago')
 
-            # Force refresh if button clicked or auto-update triggered
-            if refresh_latency or (auto_update_latency and latency_time_since >= 5):
+            # Force refresh only if button clicked (removed auto-update to prevent freezing)
+            if refresh_latency:
                 st.session_state.latency_last_update = time.time()
-                if auto_update_latency:
-                    time.sleep(0.1)
-                    st.rerun()
 
             # Create placeholders for live latency updates
             latency_chart_placeholder = st.empty()
@@ -1120,6 +1117,122 @@ elif st.session_state.current_page == 'AI Analysis':
             if analysis.get('extracted_text'):
                 st.subheader('📝 Extracted Text')
                 st.text_area('Text Content', analysis['extracted_text'], height=100, disabled=True)
+
+elif st.session_state.current_page == 'AI Creative Assistant':
+    st.markdown('<h2 class="section-header">AI-Powered Retail Creative Assistant</h2>', unsafe_allow_html=True)
+    st.markdown('Analyze packshots and generate compliant advertising assets across multiple formats.')
+
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.subheader('Select Packshot Asset')
+        creative_asset_id = st.number_input('Asset ID', min_value=0, value=st.session_state.selected_asset, key='creative_asset_id', help='Enter packshot asset ID to analyze and generate creatives')
+
+        if creative_asset_id > 0:
+            resp = requests.get(f'{BACKEND_URL}/asset/{creative_asset_id}', headers=get_auth_headers())
+            if resp.ok:
+                st.image(resp.content, caption=f'Packshot Asset {creative_asset_id}', width=250)
+            else:
+                st.error('Asset not found')
+
+        st.subheader('Generation Options')
+        generate_creatives = st.checkbox('Generate Ad Creatives', value=True, help='Create images for Story, Feed, and Banner formats')
+        include_analysis = st.checkbox('Include Detailed Analysis', value=True, help='Show OCR, object detection, and compliance analysis')
+
+        if st.button('Generate Advertising Assets', type='primary', use_container_width=True):
+            with st.spinner('Analyzing packshot and generating creatives...'):
+                resp = requests.post(f'{BACKEND_URL}/generate_ad_assets', data={'asset_id': creative_asset_id}, headers=get_auth_headers())
+            if resp.ok:
+                result = resp.json()
+                st.session_state.last_creative_result = result
+                st.success('Creative assets generated successfully!')
+            else:
+                st.error('Generation failed. Please check the asset and try again.')
+
+    with col2:
+        st.subheader('Generated Assets & Analysis')
+        if 'last_creative_result' in st.session_state:
+            result = st.session_state.last_creative_result
+
+            if include_analysis:
+                # Show analysis results
+                st.subheader('📊 Packshot Analysis')
+                analysis = result['analysis']
+
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    st.metric('Dimensions', f"{analysis['dimensions']['width']}x{analysis['dimensions']['height']}")
+                with col_b:
+                    st.metric('Has Text', 'Yes' if analysis['has_text'] else 'No')
+                with col_c:
+                    st.metric('People Detected', len(analysis.get('detected_people', [])))
+
+                if analysis.get('extracted_text'):
+                    st.subheader('📝 Extracted Text')
+                    st.text_area('OCR Content', analysis['extracted_text'][:300], height=80, disabled=True)
+
+                if analysis.get('detected_objects'):
+                    st.subheader('🔍 Detected Objects')
+                    objects = [obj['label'] for obj in analysis['detected_objects']]
+                    st.write(' '.join([f"#{obj}" for obj in objects]))
+
+                if analysis.get('restricted_content'):
+                    st.error('⚠️ Restricted content detected (people in image)')
+
+            # Show marketing text
+            st.subheader('📝 Generated Marketing Text')
+            marketing = result['marketing_text']
+            st.write(f"**Headline:** {marketing['headline']}")
+            st.write(f"**Subhead:** {marketing['subhead']}")
+            st.write(f"**Disclaimer:** {marketing['caveat']}")
+
+            if generate_creatives:
+                # Show generated assets
+                st.subheader('🎨 Generated Ad Creatives')
+                generated = result['generated_assets']
+
+                formats = ['story', 'feed', 'banner']
+                format_names = {'story': 'Instagram Story (9:16)', 'feed': 'Instagram Feed (1:1)', 'banner': 'Facebook Banner (1.91:1)'}
+
+                for fmt in formats:
+                    if fmt in generated:
+                        asset_data = generated[fmt]
+                        if 'error' in asset_data:
+                            st.error(f"Failed to generate {format_names[fmt]}: {asset_data['error']}")
+                        else:
+                            with st.expander(f"📱 {format_names[fmt]}", expanded=True):
+                                # Show image if available
+                                if 'path' in asset_data:
+                                    # In production, you'd fetch the image from the server
+                                    st.info(f"Generated image saved as: {asset_data['filename']}")
+
+                                # Show evaluation metrics
+                                if 'evaluation' in asset_data:
+                                    eval_data = asset_data['evaluation']
+                                    col1, col2, col3, col4 = st.columns(4)
+                                    with col1:
+                                        st.metric('Brightness', f"{eval_data['brightness']:.1f}")
+                                    with col2:
+                                        st.metric('Contrast', f"{eval_data['contrast']:.2f}")
+                                    with col3:
+                                        st.metric('Text Readable', 'Yes' if eval_data['text_readable'] else 'No')
+                                    with col4:
+                                        st.metric('Layout Balance', f"{eval_data['layout_balance_score']:.0f}")
+
+                                    # Compliance indicators
+                                    compliance_issues = []
+                                    if not eval_data['text_readable']:
+                                        compliance_issues.append('Low text readability')
+                                    if not eval_data['safe_zone_compliant']:
+                                        compliance_issues.append('Safe zone violation')
+                                    if not eval_data['platform_suitable']:
+                                        compliance_issues.append('Not platform suitable')
+
+                                    if compliance_issues:
+                                        st.warning(f"⚠️ Issues: {', '.join(compliance_issues)}")
+                                    else:
+                                        st.success('✅ All quality checks passed!')
+                    else:
+                        st.warning(f"{format_names[fmt]} not generated")
 
 elif st.session_state.current_page == 'Version History':
     st.markdown('<h2 class="section-header">Asset Version History</h2>', unsafe_allow_html=True)
