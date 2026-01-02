@@ -45,6 +45,10 @@ python -m venv .venv
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Configure environment variables
+cp .env.example .env
+# Edit .env file with your settings (especially JWT_SECRET)
 ```
 
 ### 4. Set Up Frontend
