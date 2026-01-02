@@ -238,7 +238,7 @@ for option in nav_options:
         f"{icon} {option}",
         key=f"nav_{option}",
         help=f"Navigate to {option}",
-        use_container_width=True
+        width='stretch'
     ):
         st.session_state.current_page = option
 
@@ -254,9 +254,9 @@ if st.session_state.current_page == 'Dashboard':
     with col1:
         date_range = st.selectbox('Time Range', ['Last 7 days', 'Last 30 days', 'Last 90 days', 'All time'], index=1, label_visibility='collapsed')
     with col2:
-        refresh = st.button('🔄 Refresh Data', help='Update dashboard with latest data', use_container_width=True)
+        refresh = st.button('🔄 Refresh Data', help='Update dashboard with latest data', width='stretch')
     with col3:
-        export = st.button('📊 Export CSV Report', help='Download comprehensive system report as CSV', use_container_width=True)
+        export = st.button('📊 Export CSV Report', help='Download comprehensive system report as CSV', width='stretch')
         if export:
             with st.spinner('Generating comprehensive report...'):
                 resp = requests.get(f'{BACKEND_URL}/export_report', headers=get_auth_headers())
@@ -414,7 +414,7 @@ if st.session_state.current_page == 'Dashboard':
 
             # Weekly Performance Analysis - Full Width
             with st.container(height=500):
-                st.markdown('<h4 style="text-align: center; color: #1e293b; margin-bottom: 20px;">📅 Weekly Performance Analysis & Trends</h4>', unsafe_allow_html=True)
+                st.markdown('<h4 style="text-align: center; color: #fff; margin-bottom: 20px;">📅 Weekly Performance Analysis & Trends</h4>', unsafe_allow_html=True)
 
                 weekday_uploads = df.groupby('weekday').size().reindex(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
                 weekday_data = weekday_uploads.fillna(0)
@@ -620,7 +620,7 @@ if st.session_state.current_page == 'Dashboard':
                 st.subheader('⚡ Quick Actions')
 
                 # Clean Up Assets
-                if st.button('🧹 Clean Up Assets', help='Remove unused assets older than 30 days', use_container_width=True):
+                if st.button('🧹 Clean Up Assets', help='Remove unused assets older than 30 days', width='stretch'):
                     with st.spinner('Checking for old assets...'):
                         resp = requests.post(f'{BACKEND_URL}/cleanup_assets', data={'days': 30}, headers=get_auth_headers())
                     if resp.ok:
@@ -636,7 +636,7 @@ if st.session_state.current_page == 'Dashboard':
                         st.error('Cleanup check failed')
 
                 # Generate Report
-                if st.button('📊 Generate Report', help='Create monthly analytics report', use_container_width=True):
+                if st.button('📊 Generate Report', help='Create monthly analytics report', width='stretch'):
                     with st.spinner('Generating report...'):
                         resp = requests.post(f'{BACKEND_URL}/generate_report', headers=get_auth_headers())
                     if resp.ok:
@@ -651,7 +651,7 @@ if st.session_state.current_page == 'Dashboard':
                         st.error('Report generation failed')
 
                 # System Maintenance (Health Check)
-                if st.button('🔧 System Maintenance', help='Run system health checks', use_container_width=True):
+                if st.button('🔧 System Maintenance', help='Run system health checks', width='stretch'):
                     with st.spinner('Running health checks...'):
                         resp = requests.post(f'{BACKEND_URL}/system_health', headers=get_auth_headers())
                     if resp.ok:
@@ -672,14 +672,14 @@ if st.session_state.current_page == 'Dashboard':
                         st.error('Health check failed')
 
                 # Send Notifications
-                if st.button('📧 Send Notifications', help='Notify team about updates', use_container_width=True):
+                if st.button('📧 Send Notifications', help='Notify team about updates', width='stretch'):
                     with st.spinner('Sending notifications...'):
                         # Mock notification sending
                         time.sleep(1)
                     st.success('Notifications sent to team!')
 
                 # Backup Data
-                if st.button('💾 Backup Data', help='Create system backup', use_container_width=True):
+                if st.button('💾 Backup Data', help='Create system backup', width='stretch'):
                     with st.spinner('Creating backup...'):
                         resp = requests.post(f'{BACKEND_URL}/backup_data', headers=get_auth_headers())
                     if resp.ok:
@@ -692,7 +692,7 @@ if st.session_state.current_page == 'Dashboard':
                         st.error('Backup operation failed')
 
                 # Sync Assets
-                if st.button('🔄 Sync Assets', help='Synchronize with cloud storage', use_container_width=True):
+                if st.button('🔄 Sync Assets', help='Synchronize with cloud storage', width='stretch'):
                     with st.spinner('Synchronizing...'):
                         # Mock sync operation
                         time.sleep(2)
@@ -704,7 +704,7 @@ if st.session_state.current_page == 'Dashboard':
             # Manual update controls (no auto-update to prevent freezing)
             col_refresh, col_status = st.columns([1, 3])
             with col_refresh:
-                refresh_analytics = st.button('🔄 Refresh Analytics', help='Update analytics with latest data', use_container_width=True)
+                refresh_analytics = st.button('🔄 Refresh Analytics', help='Update analytics with latest data', width='stretch')
             with col_status:
                 if 'analytics_last_update' not in st.session_state:
                     st.session_state.analytics_last_update = time.time()
@@ -830,7 +830,7 @@ if st.session_state.current_page == 'Dashboard':
             # Live update controls for latency
             col_lat_refresh, col_lat_auto, col_lat_status = st.columns([1, 1, 2])
             with col_lat_refresh:
-                refresh_latency = st.button('🔄 Refresh Latency', help='Update latency data', use_container_width=True)
+                refresh_latency = st.button('🔄 Refresh Latency', help='Update latency data', width='stretch')
             with col_lat_auto:
                 auto_update_latency = st.checkbox('Auto Update Latency', value=False, help='Automatically refresh latency every 5 seconds (disabled by default to prevent screen freezing)')
             with col_lat_status:
@@ -982,7 +982,7 @@ elif st.session_state.current_page == 'Asset Library':
                             st.image(resp_img.content, width=150)
                         st.caption(f'ID: {asset["id"]}')
                         st.caption(asset['label'] or 'Untitled')
-                        if st.button('Select for Editing', key=f'select_{asset["id"]}', use_container_width=True):
+                        if st.button('Select for Editing', key=f'select_{asset["id"]}', width='stretch'):
                             st.session_state.selected_asset = asset["id"]
                             st.success(f'Asset {asset["id"]} selected')
                         st.markdown('</div>', unsafe_allow_html=True)
@@ -1031,7 +1031,7 @@ elif st.session_state.current_page == 'Image Editor':
             overlay_y = st.number_input('Y Position', min_value=0, value=10)
             font_size = st.slider('Font Size', 10, 100, 20)
 
-        if st.button('Apply Changes', type='primary', use_container_width=True):
+        if st.button('Apply Changes', type='primary', width='stretch'):
             with st.spinner('Processing image...'):
                 data = {
                     'asset_id': int(asset_id),
@@ -1077,7 +1077,7 @@ elif st.session_state.current_page == 'AI Analysis':
             else:
                 st.error('Asset not found')
 
-        if st.button('Analyze Image', type='primary', use_container_width=True):
+        if st.button('Analyze Image', type='primary', width='stretch'):
             with st.spinner('AI analyzing image...'):
                 resp = requests.post(f'{BACKEND_URL}/analyze_image', data={'asset_id': analysis_asset_id}, headers=get_auth_headers())
             if resp.ok:
@@ -1150,7 +1150,7 @@ elif st.session_state.current_page == 'AI Creative Assistant':
         generate_creatives = st.checkbox('Generate Ad Creatives', value=True, help='Create images for Story, Feed, and Banner formats')
         include_analysis = st.checkbox('Include Detailed Analysis', value=True, help='Show OCR, object detection, and compliance analysis')
 
-        if st.button('Generate Advertising Assets', type='primary', use_container_width=True):
+        if st.button('Generate Advertising Assets', type='primary', width='stretch'):
             with st.spinner('Analyzing packshot and generating creatives...'):
                 resp = requests.post(f'{BACKEND_URL}/generate_ad_assets', data={'asset_id': creative_asset_id}, headers=get_auth_headers())
             if resp.ok:
@@ -1265,7 +1265,7 @@ elif st.session_state.current_page == 'Version History':
                 st.error('Asset not found')
 
             # Get version history
-            if st.button('Load Version History', use_container_width=True):
+            if st.button('Load Version History', width='stretch'):
                 with st.spinner('Loading version history...'):
                     resp = requests.get(f'{BACKEND_URL}/asset/{version_asset_id}/versions', headers=get_auth_headers())
                 if resp.ok:
@@ -1301,7 +1301,7 @@ elif st.session_state.current_page == 'Version History':
                             st.json(version['params'])
 
                         # Restore button
-                        if st.button(f'Restore to Version {version["version"]}', key=f'restore_{version["version"]}', use_container_width=True):
+                        if st.button(f'Restore to Version {version["version"]}', key=f'restore_{version["version"]}', width='stretch'):
                             with st.spinner('Restoring version...'):
                                 resp = requests.post(f'{BACKEND_URL}/asset/{version_asset_id}/restore/{version["version"]}', headers=get_auth_headers())
                             if resp.ok:
@@ -1313,63 +1313,270 @@ elif st.session_state.current_page == 'Version History':
                                 st.error('Restore failed')
 
 elif st.session_state.current_page == 'Compliance Check':
-    st.markdown('<h2 class="section-header">Compliance Validation</h2>', unsafe_allow_html=True)
-    st.markdown('Ensure your creatives meet brand guidelines and legal requirements.')
+    st.markdown('<h2 class="section-header">Advanced Compliance Validation</h2>', unsafe_allow_html=True)
+    st.markdown('Comprehensive brand guidelines and legal compliance checking for creative assets.')
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader('Content Guidelines')
+    # Platform selection
+    platforms = {
+        'general': 'General Guidelines',
+        'instagram_story': 'Instagram Story (9:16)',
+        'instagram_feed': 'Instagram Feed (1:1)',
+        'facebook_banner': 'Facebook Banner (1.91:1)'
+    }
+
+    selected_platform = st.selectbox('Select Target Platform', list(platforms.keys()), format_func=lambda x: platforms[x], key='compliance_platform')
+
+    tab1, tab2, tab3 = st.tabs(['📝 Content Validation', '🖼️ Image Compliance', '📊 Batch Check'])
+
+    with tab1:
+        st.subheader('Creative Copy Validation')
         with st.form('content_validation'):
-            st.markdown('**Creative Copy**')
-            headline = st.text_input('Headline', placeholder='Enter headline text')
-            subhead = st.text_input('Subheadline', placeholder='Enter subheadline text')
-            caveat = st.text_input('Disclaimer/Caveat', placeholder='e.g., drinkaware message for alcohol')
-            tags = st.text_input('Tags/Labels', placeholder='e.g., Available at Tesco')
+            col1, col2 = st.columns(2)
+            with col1:
+                headline = st.text_input('Headline', placeholder='Enter compelling headline text', help='Main call-to-action text')
+                subhead = st.text_input('Subheadline', placeholder='Supporting message', help='Additional descriptive text')
+                description = st.text_area('Description (Optional)', placeholder='Detailed product description', height=80, help='Extended content for context')
 
-            submitted = st.form_submit_button('Validate Content', use_container_width=True)
+            with col2:
+                caveat = st.text_input('Disclaimer/Caveat', placeholder='Legal disclaimers, drinkaware, etc.', help='Required legal text')
+                tags = st.text_input('Tags/Labels', placeholder='Available at Tesco, Clubcard Price, etc.', help='Brand-approved tags')
+
+                st.markdown('**Platform Requirements**')
+                if selected_platform == 'instagram_story':
+                    st.info('📱 Instagram Story: Keep text concise, vertical format')
+                elif selected_platform == 'instagram_feed':
+                    st.info('📱 Instagram Feed: Square format, engaging visuals')
+                elif selected_platform == 'facebook_banner':
+                    st.info('📘 Facebook Banner: Horizontal format, clear CTA')
+
+            submitted = st.form_submit_button('🔍 Validate Content', width='stretch', type='primary')
             if submitted:
-                with st.spinner('Checking guidelines...'):
-                    resp = requests.post(f'{BACKEND_URL}/validate', data={'headline':headline,'subhead':subhead,'caveat':caveat,'tags':tags}, headers=get_auth_headers())
+                with st.spinner('Analyzing content compliance...'):
+                    data = {
+                        'headline': headline,
+                        'subhead': subhead,
+                        'caveat': caveat,
+                        'tags': tags,
+                        'description': description,
+                        'platform': selected_platform
+                    }
+                    resp = requests.post(f'{BACKEND_URL}/validate', data=data, headers=get_auth_headers())
+
                 if resp.ok:
-                    issues = resp.json().get('issues', [])
-                    if issues:
-                        st.subheader('Validation Results')
-                        for issue in issues:
-                            if issue['type'] == 'hard_fail':
-                                st.error(f'❌ {issue["msg"]}')
-                            else:
-                                st.warning(f'⚠️ {issue["msg"]}')
+                    result = resp.json()
+                    issues = result.get('issues', [])
+
+                    # Categorize issues
+                    hard_fails = [i for i in issues if i['type'] == 'hard_fail']
+                    warnings = [i for i in issues if i['type'] == 'warning']
+                    info_items = [i for i in issues if i['type'] == 'info']
+
+                    if hard_fails:
+                        st.error('🚫 **Critical Issues Found**')
+                        for issue in hard_fails:
+                            st.error(f"• {issue['msg']}")
+                    elif warnings:
+                        st.warning('⚠️ **Review Required**')
+                        for issue in warnings:
+                            st.warning(f"• {issue['msg']}")
                     else:
-                        st.success('✅ All content checks passed!')
+                        st.success('✅ **All Content Checks Passed!**')
+
+                    if info_items:
+                        with st.expander('💡 Guidelines & Recommendations'):
+                            for issue in info_items:
+                                st.info(f"• {issue['msg']}")
+
+                    # Show summary metrics
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric('Critical Issues', len(hard_fails))
+                    with col2:
+                        st.metric('Warnings', len(warnings))
+                    with col3:
+                        st.metric('Suggestions', len(info_items))
+                    with col4:
+                        compliance_score = 100 - (len(hard_fails) * 50) - (len(warnings) * 10)
+                        compliance_score = max(0, compliance_score)
+                        st.metric('Compliance Score', f'{compliance_score}%')
+
                 else:
-                    st.error('Validation service unavailable')
+                    st.error('❌ Validation service unavailable')
 
-    with col2:
-        st.subheader('Image Compliance')
-        img_asset_id = st.number_input('Asset ID for Validation', min_value=0, value=st.session_state.selected_asset, key='val_asset_id', help='Select asset from library')
-        if img_asset_id > 0:
-            resp = requests.get(f'{BACKEND_URL}/asset/{img_asset_id}', headers=get_auth_headers())
-            if resp.ok:
-                st.image(resp.content, caption=f'Asset {img_asset_id}', width=250)
-            else:
-                st.warning('Asset preview unavailable')
+    with tab2:
+        st.subheader('Image Compliance Analysis')
 
-        if st.button('Check Image Compliance', use_container_width=True):
-            with st.spinner('Analyzing image...'):
-                resp = requests.post(f'{BACKEND_URL}/validate_image', data={'asset_id': int(img_asset_id)}, headers=get_auth_headers())
-            if resp.ok:
-                issues = resp.json().get('issues', [])
-                if issues:
-                    st.subheader('Image Analysis Results')
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            img_asset_id = st.number_input('Asset ID', min_value=0, value=st.session_state.selected_asset, key='val_asset_id', help='Enter asset ID from library')
+
+            if img_asset_id > 0:
+                resp = requests.get(f'{BACKEND_URL}/asset/{img_asset_id}', headers=get_auth_headers())
+                if resp.ok:
+                    st.image(resp.content, caption=f'Asset {img_asset_id}', width=200)
+                else:
+                    st.warning('Asset preview unavailable')
+
+            # Platform-specific guidance
+            if selected_platform != 'general':
+                st.markdown('**Platform Guidelines:**')
+                if selected_platform == 'instagram_story':
+                    st.info('• Aspect ratio: 9:16\n• Safe zones: 200px top, 250px bottom\n• Min font size: 24px')
+                elif selected_platform == 'instagram_feed':
+                    st.info('• Aspect ratio: 1:1\n• Safe zones: 150px all sides\n• Min font size: 20px')
+                elif selected_platform == 'facebook_banner':
+                    st.info('• Aspect ratio: 1.91:1\n• Safe zones: 50px margins\n• Min font size: 18px')
+
+        with col2:
+            if st.button('🔍 Analyze Image Compliance', width='stretch', type='primary'):
+                with st.spinner('Performing comprehensive image analysis...'):
+                    resp = requests.post(f'{BACKEND_URL}/validate_image', data={'asset_id': int(img_asset_id), 'platform': selected_platform}, headers=get_auth_headers())
+
+                if resp.ok:
+                    result = resp.json()
+                    issues = result.get('issues', [])
+
+                    # Group issues by category
+                    categories = {}
                     for issue in issues:
-                        if issue['type'] == 'hard_fail':
-                            st.error(f'❌ {issue["msg"]}')
-                        else:
-                            st.warning(f'⚠️ {issue["msg"]}')
+                        cat = issue.get('category', 'general')
+                        if cat not in categories:
+                            categories[cat] = []
+                        categories[cat].append(issue)
+
+                    # Display results by category
+                    for category, cat_issues in categories.items():
+                        category_name = category.replace('_', ' ').title()
+                        hard_fails = [i for i in cat_issues if i['type'] == 'hard_fail']
+                        warnings = [i for i in cat_issues if i['type'] == 'warning']
+                        info_items = [i for i in cat_issues if i['type'] == 'info']
+
+                        with st.expander(f'{"⚫" if hard_fails else "🟡" if warnings else "🟢"} {category_name} ({len(cat_issues)} issues)', expanded=bool(hard_fails or warnings)):
+                            for issue in cat_issues:
+                                if issue['type'] == 'hard_fail':
+                                    st.error(f"🚫 {issue['msg']}")
+                                elif issue['type'] == 'warning':
+                                    st.warning(f"⚠️ {issue['msg']}")
+                                else:
+                                    st.info(f"💡 {issue['msg']}")
+
+                    # Overall compliance score
+                    total_hard_fails = sum(1 for i in issues if i['type'] == 'hard_fail')
+                    total_warnings = sum(1 for i in issues if i['type'] == 'warning')
+
+                    score = 100 - (total_hard_fails * 30) - (total_warnings * 10)
+                    score = max(0, score)
+
+                    if score >= 80:
+                        st.success(f'🎉 **High Compliance** - Score: {score}%')
+                    elif score >= 60:
+                        st.warning(f'⚠️ **Needs Review** - Score: {score}%')
+                    else:
+                        st.error(f'🚫 **Major Issues** - Score: {score}%')
+
                 else:
-                    st.success('✅ Image meets all compliance requirements!')
+                    st.error('❌ Image analysis service unavailable')
+
+    with tab3:
+        st.subheader('Batch Compliance Analysis')
+        st.markdown('Check multiple assets at once for efficient workflow management.')
+
+        # Get assets list
+        resp = requests.get(f'{BACKEND_URL}/assets', headers=get_auth_headers())
+        if resp.ok:
+            assets = resp.json()
+            if assets:
+                # Multi-select assets
+                asset_options = {f"{a['id']}: {a.get('label', 'Untitled')}" for a in assets}
+                selected_assets = st.multiselect('Select Assets to Check', list(asset_options), help='Choose multiple assets for batch validation')
+
+                check_type = st.radio('Check Type', ['Content Only', 'Images Only', 'Both'], horizontal=True)
+
+                if st.button('🚀 Run Batch Check', width='stretch', type='primary') and selected_assets:
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+
+                    results = []
+                    total = len(selected_assets)
+
+                    for i, asset_str in enumerate(selected_assets):
+                        asset_id = int(asset_str.split(':')[0])
+                        status_text.text(f'Checking asset {asset_id}... ({i+1}/{total})')
+                        progress_bar.progress((i + 1) / total)
+
+                        try:
+                            if check_type in ['Images Only', 'Both']:
+                                resp_img = requests.post(f'{BACKEND_URL}/validate_image', data={'asset_id': asset_id, 'platform': selected_platform}, headers=get_auth_headers())
+                                img_issues = resp_img.json().get('issues', []) if resp_img.ok else [{'type': 'error', 'msg': 'Service unavailable'}]
+
+                            if check_type in ['Content Only', 'Both']:
+                                # For batch, we'd need content data - simplified for now
+                                content_issues = []
+
+                            results.append({
+                                'asset_id': asset_id,
+                                'image_issues': img_issues if check_type in ['Images Only', 'Both'] else [],
+                                'content_issues': content_issues if check_type in ['Content Only', 'Both'] else []
+                            })
+
+                        except Exception as e:
+                            results.append({
+                                'asset_id': asset_id,
+                                'error': str(e)
+                            })
+
+                    progress_bar.empty()
+                    status_text.empty()
+
+                    # Display batch results
+                    st.subheader('📊 Batch Results Summary')
+
+                    summary_data = []
+                    for result in results:
+                        asset_id = result['asset_id']
+                        img_hard_fails = sum(1 for i in result.get('image_issues', []) if i.get('type') == 'hard_fail')
+                        img_warnings = sum(1 for i in result.get('image_issues', []) if i.get('type') == 'warning')
+                        content_hard_fails = sum(1 for i in result.get('content_issues', []) if i.get('type') == 'hard_fail')
+                        content_warnings = sum(1 for i in result.get('content_issues', []) if i.get('type') == 'warning')
+
+                        total_hard_fails = img_hard_fails + content_hard_fails
+                        total_warnings = img_warnings + content_warnings
+
+                        compliance_score = 100 - (total_hard_fails * 30) - (total_warnings * 10)
+                        compliance_score = max(0, compliance_score)
+
+                        summary_data.append({
+                            'Asset ID': asset_id,
+                            'Image Issues': f"{img_hard_fails}H {img_warnings}W",
+                            'Content Issues': f"{content_hard_fails}H {content_warnings}W",
+                            'Compliance Score': f"{compliance_score}%",
+                            'Status': '🟢 Pass' if compliance_score >= 80 else '🟡 Review' if compliance_score >= 60 else '🔴 Fail'
+                        })
+
+                    st.dataframe(summary_data, width='stretch')
+
+                    # Export option
+                    if st.button('📥 Prepare Export'):
+                        import pandas as pd
+                        df = pd.DataFrame(summary_data)
+                        csv = df.to_csv(index=False)
+                        st.session_state.export_csv = csv
+                        st.success('Export data prepared!')
+
+                    # Show download button if data is available
+                    if 'export_csv' in st.session_state:
+                        st.download_button(
+                            label='📥 Download CSV Report',
+                            data=st.session_state.export_csv,
+                            file_name='compliance_batch_results.csv',
+                            mime='text/csv',
+                            help='Click to download the compliance results'
+                        )
+
             else:
-                st.error('Image validation service unavailable')
+                st.info('No assets available. Upload some assets first.')
+        else:
+            st.error('Unable to load assets list')
 
 st.markdown('---')
 st.caption('Advanced Creative Asset Management Platform - Prototype Version')

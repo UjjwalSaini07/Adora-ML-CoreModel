@@ -229,20 +229,20 @@ async def manipulate_image(asset_id: int = Form(...), remove_bg: bool = Form(Fal
     return {'result_path': out_path, 'new_version': new_version, 'operations_applied': operations_applied}
 
 @app.post('/validate')
-async def validate(headline: str = Form(''), subhead: str = Form(''), caveat: str = Form(''), tags: str = Form(''), current_user: dict = Depends(verify_token)):
-    payload = {'headline': headline, 'subhead': subhead, 'caveat': caveat, 'tags': tags}
-    issues = validate_creative_rules(payload)
-    logger.info(f'Validation run issues={issues}')
-    return {'issues': issues}
+async def validate(headline: str = Form(''), subhead: str = Form(''), caveat: str = Form(''), tags: str = Form(''), description: str = Form(''), platform: str = Form('general'), current_user: dict = Depends(verify_token)):
+    payload = {'headline': headline, 'subhead': subhead, 'caveat': caveat, 'tags': tags, 'description': description}
+    issues = validate_creative_rules(payload, platform)
+    logger.info(f'Validation run for {platform} issues={len(issues)}')
+    return {'issues': issues, 'platform': platform}
 
 @app.post('/validate_image')
-async def validate_image(asset_id: int = Form(...), current_user: dict = Depends(verify_token)):
+async def validate_image(asset_id: int = Form(...), platform: str = Form('general'), current_user: dict = Depends(verify_token)):
     path = get_asset_path(DB_PATH, asset_id)
     if not path:
         raise HTTPException(status_code=404, detail='Asset not found')
-    issues = validate_image_guidelines(path)
-    logger.info(f'Image validation for {asset_id} issues={issues}')
-    return {'issues': issues}
+    issues = validate_image_guidelines(path, platform)
+    logger.info(f'Image validation for {asset_id} on {platform} issues={len(issues)}')
+    return {'issues': issues, 'platform': platform}
 
 @app.get('/download_sample_zip')
 def download_sample_zip():
