@@ -71,19 +71,7 @@ Adora is designed for retail media creative management, providing AI-powered too
 
 ### System Components
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Streamlit UI  │◄──►│   FastAPI       │◄──►│   SQLite DB     │
-│   (Frontend)    │    │   Backend       │    │   (Assets)      │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 ▼
-                    ┌─────────────────┐
-                    │   AI Models     │
-                    │   (GPU/CPU)     │
-                    └─────────────────┘
-```
+<img width="1550" height="834" alt="diagram-export-03-01-2026-13_55_20" src="https://github.com/user-attachments/assets/2a02f3b2-965a-46cb-9d9f-c6d64df3742a" />
 
 ### Technology Stack
 
