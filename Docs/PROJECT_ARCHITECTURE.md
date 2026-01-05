@@ -28,6 +28,8 @@ Adora ML Core Model is a comprehensive AI-powered platform for automated creativ
 
 ### High-Level Architecture
 
+<img width="1550" height="834" alt="diagram-export-03-01-2026-13_55_20" src="https://github.com/user-attachments/assets/2a02f3b2-965a-46cb-9d9f-c6d64df3742a" />
+
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Streamlit UI  │◄──►│   FastAPI       │◄──►│   SQLite DB     │
