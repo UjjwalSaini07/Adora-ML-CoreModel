@@ -98,7 +98,7 @@ Adora is designed for retail media creative management, providing AI-powered too
 
 ### System Components
 
-<img width="1550" height="834" alt="diagram-export-03-01-2026-13_55_20" src="https://github.com/user-attachments/assets/2a02f3b2-965a-46cb-9d9f-c6d64df3742a" />
+<img width="1651" height="1115" alt="diagram-export-07-01-2026-18_13_32" src="https://github.com/user-attachments/assets/9f735971-fe89-4bd1-8760-1100237453da" />
 
 ### Technology Stack
 
@@ -316,6 +316,22 @@ POST /generate_report  # Analytics report
 - **Stable Diffusion**: ~10GB disk space
 - **OCR Engine**: Tesseract OCR installed
 - **CUDA**: Optional, enables GPU acceleration
+
+## Walkthrough
+<table style="width: 100%;">
+  <tr>
+    <td align="center" width="50%">
+      <img width="1918" height="927" alt="SS1" src="https://github.com/user-attachments/assets/e1b70d51-8b74-4860-870e-41768e4bc195" /><br>
+      <b>Welcome Screen</b><br>
+      Displays the Welcome Note with logo.
+    </td>
+    <td align="center" width="50%">
+      <img width="1918" height="927" alt="SS2" src="https://github.com/user-attachments/assets/006b829e-b0ae-46ae-a837-8172a906e4ca" /><br>
+      <b>Welcome Screen</b><br>
+      Displays the Welcome Note with logo.
+    </td>
+  </tr>
+</table>
 
 ## 🤝 Contributing
 
