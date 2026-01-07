@@ -324,6 +324,13 @@ Adora-ML-CoreModel/
 └── README.md           # This file
 ```
 
+## Team Details:
+
+| [Arti Manral ](https://www.linkedin.com/in//)| [Khushi Tyagi](https://www.linkedin.com/in//)| [Ujjwal Saini](https://www.linkedin.com/in/ujjwalsaini07/)| [Prateek Parija](https://www.linkedin.com/in/)| [Vedansh Hooda ](https://www.linkedin.com/in//)| 
+| ----------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------- |----------------------------------------------------------------- |
+| Developer | Developer | Developer | Developer | Developer                
+| [Resume](https://github.com/UjjwalSaini07/Adora-ML-CoreModel/blob/main/TeamMember_Resumes/Arti_Manral_resume.pdf) | [Resume](https://github.com/UjjwalSaini07/Adora-ML-CoreModel/blob/main/TeamMember_Resumes/Khushi_Tyagi_Resume.pdf) | [Resume](https://github.com/UjjwalSaini07/Adora-ML-CoreModel/blob/main/TeamMember_Resumes/Ujjwal_Resume2026.pdf) |  [Resume](https://github.com/UjjwalSaini07/Adora-ML-CoreModel/blob/main/TeamMember_Resumes/Prateek_Resume.pdf) |  [Resume](https://github.com/UjjwalSaini07/Adora-ML-CoreModel/blob/main/TeamMember_Resumes/Vedansh-Resume.pdf) 
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
