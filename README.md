@@ -322,15 +322,80 @@ POST /generate_report  # Analytics report
   <tr>
     <td align="center" width="50%">
       <img width="1918" height="927" alt="SS1" src="https://github.com/user-attachments/assets/e1b70d51-8b74-4860-870e-41768e4bc195" /><br>
-      <b>Welcome Screen</b><br>
-      Displays the Welcome Note with logo.
+      <b>Auth Screen</b><br>
     </td>
     <td align="center" width="50%">
       <img width="1918" height="927" alt="SS2" src="https://github.com/user-attachments/assets/006b829e-b0ae-46ae-a837-8172a906e4ca" /><br>
-      <b>Welcome Screen</b><br>
-      Displays the Welcome Note with logo.
+      <b>Hero Main Screen</b><br>
     </td>
   </tr>
+  
+  <tr>
+    <td align="center" width="50%">
+      <img width="1918" height="926" alt="SS3" src="https://github.com/user-attachments/assets/f2107c1c-f152-44c7-8ef9-d6f9ced0d3c9" />
+      <b>Admin Screen 1</b><br>
+    </td>
+    <td align="center" width="50%">
+      <img width="1918" height="927" alt="SS4" src="https://github.com/user-attachments/assets/d623de43-70df-4a4c-a9a3-b1cb617a2a6f" />
+      <b>Admin Screen 2</b><br>
+    </td>
+  </tr>
+  
+  <tr>
+    <td align="center" width="50%">
+      <img width="1918" height="921" alt="SS5" src="https://github.com/user-attachments/assets/7aea02b9-52eb-44d9-9f29-7d3d844a712d" />
+      <b>Auth Screen 3</b><br>
+    </td>
+    <td align="center" width="50%">
+      <img width="1918" height="927" alt="SS6" src="https://github.com/user-attachments/assets/eb02326e-814a-42d4-993f-679d8ffe58e6" />
+      <b>Auth Screen 4</b><br>
+    </td>
+  </tr>
+  
+  <tr>
+    <td align="center" width="50%">
+      <img width="1918" height="926" alt="SS7" src="https://github.com/user-attachments/assets/0f61f337-dae4-42b5-88c1-e3a1dfdfffcf" />
+      <b>Assets Library</b><br>
+    </td>
+    <td align="center" width="50%">
+      <img width="1907" height="925" alt="SS8" src="https://github.com/user-attachments/assets/6784b723-86cf-4f86-b80e-7bb281c4299a" />
+      <b>Image Editing Tool</b><br>
+    </td>
+  </tr>
+  
+  <tr>
+    <td align="center" width="50%">
+      <img width="1918" height="927" alt="SS9" src="https://github.com/user-attachments/assets/7b3151ef-710d-41d9-83cc-c6c26cdfe40f" />
+      <b>AI Analyser</b><br>
+    </td>
+    <td align="center" width="50%">
+      <img width="1918" height="920" alt="SS10" src="https://github.com/user-attachments/assets/745e590a-26b4-4806-ae48-0e57e617e309" />
+      <b>AI Creative Assistance Post Generator</b><br>
+    </td>
+  </tr>
+  
+  <tr>
+    <td align="center" width="50%">
+      <img width="1918" height="922" alt="SS11" src="https://github.com/user-attachments/assets/cdbab4e8-1f78-4e0f-8dbf-856a62107c9d" />
+      <b>Version History Rollback</b><br>
+    </td>
+    <td align="center" width="50%">
+      <img width="1918" height="922" alt="SS12" src="https://github.com/user-attachments/assets/11817dbf-be34-4ec5-b522-157278e6f7e7" />
+      <b>Advance Complaince Content Checker</b><br>
+    </td>
+  </tr>
+  
+  <tr>
+    <td align="center" width="50%">
+      <img width="1918" height="926" alt="SS13" src="https://github.com/user-attachments/assets/748c224b-52eb-4e76-b7fe-bc10e9e36949" />
+      <b>Advance Complaince Image Checker</b><br>
+    </td>
+    <td align="center" width="50%">
+      <img width="1918" height="930" alt="SS14" src="https://github.com/user-attachments/assets/3c0f1374-421b-4541-906f-27edf1d4cd8c" />
+      <b>Advance Complaince Batch Checker</b><br>
+    </td>
+  </tr>
+  
 </table>
 
 ## 🤝 Contributing
